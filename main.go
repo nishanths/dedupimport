@@ -4,7 +4,7 @@
 // When resolving duplicate imports, by default, it keeps the unnamed import
 // and removes the named imports. This behavior can be customized with the
 // '-s' flag (described below). After resolving duplicates it updates code
-// to using the old, duplicate import identifier to use the single, new one.
+// using the old, duplicate import identifier to use the new, single import.
 //
 // As a special case, the tool never removes side-effect imports ("_") and
 // dot imports ("."); these imports are allowed to coexist with regular
@@ -12,7 +12,7 @@
 //
 // The typical usage is:
 //
-//   dupeimport file1.go dir1 dir2 # print to stdout
+//   dupeimport file1.go dir1 dir2 # print updated files to stdout
 //   dupeimport -w file.go         # overwrite source file
 //   dupeimport -d file.go         # display diff
 //   dupeimport -l dir             # list files with duplicate imports
@@ -34,9 +34,13 @@
 //
 // Sometimes rewriting a file to use the updated import declaration could
 // lead to build errors. For example, it is not possible to safely change
-// "u" -> "url" in Parse because the identifier, url, already exists in the scope.
+// "u" -> "url" inside fetch because the identifier, url, already exists in
+// the scope.
 //
 //   import u "net/url"
+//   import "net/url"
+//
+//   var google = url.QueryEscape("https://google.com/?q=something")
 //
 //   func fetch(url string) {
 //      u.Parse(url)
