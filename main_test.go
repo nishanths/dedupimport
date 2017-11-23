@@ -72,6 +72,7 @@ func TestAll(t *testing.T) {
 		"testdata/cannot.go",
 		"testdata/example.go",
 		"testdata/comment.go",
+		"testdata/removed-comment.go",
 	}
 
 	for i, path := range filenames {

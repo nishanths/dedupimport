@@ -114,6 +114,11 @@ func walkFile(file *ast.File) *Scope {
 			cur.inner = append(cur.inner, inner)
 			inner.outer = cur
 			return false
+		case *ast.FuncLit:
+			inner := walkFuncLit(x)
+			cur.inner = append(cur.inner, inner)
+			inner.outer = cur
+			return false
 		}
 		return true
 	})

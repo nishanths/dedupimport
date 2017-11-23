@@ -29,10 +29,10 @@
 //
 //   - the "unnamed" strategy keeps the unnamed import if one exists, or the
 //     first import otherwise;
-//   - the "named" strategy keeps the first-occuring shortest named import if
+//   - the "named" strategy keeps the first-occurring shortest named import if
 //     one exists, or the first import otherwise;
-//   - the "comment" strategy keeps the import with a doc or a line comment if
-//     one exists, or the first import otherwise; and
+//   - the "comment" strategy keeps the first-occurring import with either a
+//     doc or a line comment if one exists, or the first import otherwise; and
 //   - the "first" strategy keeps the first import.
 //
 // Inability to rewrite
