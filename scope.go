@@ -7,7 +7,7 @@ import (
 
 type Scope struct {
 	node   ast.Node              // the underlying node that defines this scope (*ast.File, *ast.FuncDecl, *ast.BlockStmt, *ast.FuncLit)
-	outer  *Scope                // parent scope, or nil if this is the file scope
+	outer  *Scope                // parent scope, or nil
 	inner  []*Scope              // immediate inner scopes
 	idents map[string]*ast.Ident // idents in this scope; the key is the name of the ident for fast lookup
 	done   bool                  // completed "parsing" this scope; exists to guard against programmer error
