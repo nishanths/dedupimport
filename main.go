@@ -1,5 +1,5 @@
-// Command dupeimport finds and removes duplicate imports in Go source
-// files. See 'dupeimport -h' for usage.
+// Command dupeimport finds and removes duplicate imports, imported using
+// different names. See 'dupeimport -h' for usage.
 //
 // When resolving duplicate imports, by default, it keeps the unnamed import
 // and removes the named imports. This behavior can be customized with the
@@ -17,7 +17,7 @@
 //   dupeimport -d file.go         # display diff
 //   dupeimport -l dir             # list files with duplicate imports
 //
-// Strategies to resolve duplicates
+// Strategy to use when resolving duplicates
 //
 // The '-s' flag allows you to choose which import to keep and which ones to
 // remove when resolving duplicates in a file:
@@ -48,28 +48,29 @@
 //   }
 //
 // Such contrived scenarios rarely arise in practice.  But if they do, the
-// command prints a warning and skips rewriting the file.
+// command prints a warning and skips the file.
 //
 // Package names
 //
-// The command is often required to guess at the package identifier for
-// unnamed imports when rewriting the source AST. Typically this is the same
-// as the basename of the import path, but not always. The command can
-// handle automatically handle these common patterns:
+// For unnamed imports, the command guesses at the package name by looking
+// at the import path. Typically the package name is the same as the
+// basename of the import path, but not always. The command automatically
+// automatically handles these patterns:
 //
 //   Import path                            Package name    Note
-//   ------------                           ------------    -------------
+//   -----------------                      ------------    ---------------
 //   github.com/foo/bar                     bar             Standard naming
 //   gopkg.in/yaml.v2                       yaml            Remove version
 //   k8s.io/apimachinery/pkg/apis/meta/v1   meta            Remove version
-//   github.com/nishanths/go-xkcd           xkcd            Remove 'go' prefix or suffix
+//   github.com/nishanths/go-xkcd           xkcd            Remove 'go' prefix
+//   github.com/nishanths/lyft-go           lyft            Remove 'go' suffix
 //
 // To instruct the command on how to handle more complicated patterns, the
 // '-m' flag can be used. The flag can be repeated multiple times to specify
 // multipe mappings. For example:
 //
 //   dupeimport -m github.com/proj/serverimpl=server \
-//              -m github.com/priarie/go-k8s-client=clientk8s
+//     -m github.com/priarie/go-k8s-client=clientk8s
 package main
 
 import (
@@ -96,36 +97,43 @@ const help = `usage: dupeimports [flags] [path ...]`
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "%s\n", help)
-	flag.PrintDefaults()
+	flagSet.PrintDefaults()
 	os.Exit(2)
 }
 
-type MultiFlag map[string]string
+type MultiFlag struct {
+	name string
+	m    map[string]string
+}
 
 func (m MultiFlag) String() string {
-	if len(m) == 0 {
+	if len(m.m) == 0 {
 		return ""
 	}
-	return fmt.Sprint(m)
+	return fmt.Sprint(m.m)
 }
 
 func (m MultiFlag) Set(val string) error {
 	c := strings.Split(val, "=")
 	if len(c) != 2 {
-		return fmt.Errorf("flag value %q has wrong format", val)
+		return fmt.Errorf("wrong format for -%s: %s", m.name, val)
 	}
-	m[c[0]] = c[1]
+	if m.m == nil {
+		m.m = make(map[string]string)
+	}
+	m.m[c[0]] = c[1]
 	return nil
 }
 
 var (
-	diff       = flag.Bool("d", false, "display diff instead of rewriting files")
-	allErrors  = flag.Bool("e", false, "report all parse errors, not just the first 10 on different lines")
-	list       = flag.Bool("l", false, "list files with duplicate imports")
-	overwrite  = flag.Bool("w", false, "write result to source file instead of stdout")
-	importOnly = flag.Bool("i", false, "only modify imports; don't adjust rest of the file")
-	strategy   = flag.String("s", "unnamed", "`kind` of import to keep: first, comment, named, or unnamed")
-	pkgNames   = make(MultiFlag)
+	flagSet    = flag.NewFlagSet("dupeimport", flag.ExitOnError)
+	diff       = flagSet.Bool("d", false, "display diff instead of rewriting files")
+	allErrors  = flagSet.Bool("e", false, "report all parse errors, not just the first 10 on different lines")
+	list       = flagSet.Bool("l", false, "list files with duplicate imports")
+	overwrite  = flagSet.Bool("w", false, "write result to source file instead of stdout")
+	importOnly = flagSet.Bool("i", false, "only modify imports; don't adjust rest of the file")
+	strategy   = flagSet.String("s", "unnamed", "`kind` of import to keep: first, comment, named, or unnamed")
+	pkgNames   = MultiFlag{name: "m"}
 )
 
 var exitCode = 0
@@ -142,9 +150,9 @@ func setExitCode(c int) {
 var fset = token.NewFileSet()
 
 func main() {
-	flag.Var(&pkgNames, "m", "`mapping` from import path to package name; can be specified multiple times")
-	flag.Usage = usage
-	flag.Parse()
+	flagSet.Var(&pkgNames, "m", "`mapping` from import path to package name; can be repeated")
+	flagSet.Usage = usage
+	flagSet.Parse(os.Args[1:])
 
 	switch *strategy {
 	case "first", "comment", "named", "unnamed":
@@ -153,7 +161,7 @@ func main() {
 		os.Exit(2)
 	}
 
-	if flag.NArg() == 0 {
+	if flagSet.NArg() == 0 {
 		if *overwrite {
 			fmt.Fprint(os.Stderr, "cannot use -w with stdin\n")
 			os.Exit(2)
@@ -161,8 +169,8 @@ func main() {
 			handleFile(true, "<standard input>", os.Stdout) // use the same filename that gofmt uses
 		}
 	} else {
-		for i := 0; i < flag.NArg(); i++ {
-			path := flag.Arg(i)
+		for i := 0; i < flagSet.NArg(); i++ {
+			path := flagSet.Arg(i)
 			info, err := os.Stat(path)
 			if err != nil {
 				fmt.Fprint(os.Stderr, err)
@@ -493,7 +501,7 @@ func packageNameForImport(spec *ast.ImportSpec) string {
 }
 
 func packageNameForPath(p string) string {
-	if name, ok := pkgNames[p]; ok {
+	if name, ok := pkgNames.m[p]; ok {
 		return name
 	}
 	return guessPackageName(p)
@@ -611,47 +619,51 @@ func handleDir(p string) {
 
 func writeOutput(out io.Writer, src, res []byte, filename string) error {
 	// Copied from processFile in cmd/gofmt.
-	if *list {
-		fmt.Fprintln(out, filename)
+	if !bytes.Equal(res, src) {
+		if *list {
+			fmt.Fprintln(out, filename)
+		}
+		// TODO: filename can be gibberish like "<stdin>" here, but -w is not
+		// allowed for stdin in main, hence why this doesn't blow up. clean this
+		// up.
+		if *overwrite {
+			fi, err := os.Stat(filename)
+			if err != nil {
+				return err
+			}
+			perm := fi.Mode().Perm()
+			// make a temporary backup before overwriting original
+			bakname, err := backupFile(filename+".", src, perm)
+			if err != nil {
+				return err
+			}
+			err = ioutil.WriteFile(filename, res, perm)
+			if err != nil {
+				os.Rename(bakname, filename)
+				return err
+			}
+			err = os.Remove(bakname)
+			if err != nil {
+				return err
+			}
+		}
+		if *diff {
+			data, err := cmdDiff(src, res, filename)
+			if err != nil {
+				return fmt.Errorf("computing diff: %s", err)
+			}
+			fmt.Printf("diff -u %s %s\n", filepath.ToSlash(filename+".orig"), filepath.ToSlash(filename))
+			out.Write(data)
+		}
 	}
-	// TODO: filename can be gibberish like "<stdin>" here, but -w is not
-	// allowed for stdin in main, hence why this doesn't blow up. clean this
-	// up.
-	if *overwrite {
-		fi, err := os.Stat(filename)
-		if err != nil {
-			return err
-		}
-		perm := fi.Mode().Perm()
-		// make a temporary backup before overwriting original
-		bakname, err := backupFile(filename+".", src, perm)
-		if err != nil {
-			return err
-		}
-		err = ioutil.WriteFile(filename, res, perm)
-		if err != nil {
-			os.Rename(bakname, filename)
-			return err
-		}
-		err = os.Remove(bakname)
-		if err != nil {
-			return err
-		}
-	}
-	if *diff {
-		data, err := cmdDiff(src, res, filename)
-		if err != nil {
-			return fmt.Errorf("computing diff: %s", err)
-		}
-		fmt.Printf("diff -u %s %s\n", filepath.ToSlash(filename+".orig"), filepath.ToSlash(filename))
-		out.Write(data)
-	}
+
 	if !*list && !*overwrite && !*diff {
 		_, err := out.Write(res)
 		if err != nil {
 			return nil
 		}
 	}
+
 	return nil
 }
 

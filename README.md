@@ -1,6 +1,7 @@
 ## dupeimport
 
-Remove duplicate imports in Go source files.
+Remove duplicate imports in Go source files that are imported using
+different names.
 
 ```
 go get -u github.com/nishanths/dupeimport
@@ -58,4 +59,3 @@ var client frontend.Client
 
 func send(req frontend.Request) { ... }
 ```
-
