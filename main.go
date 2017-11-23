@@ -101,113 +101,6 @@ func main() {
 	}
 }
 
-func handleFile(stdin bool, filename string, out io.Writer) {
-	var src []byte
-	var err error
-	if stdin {
-		src, err = ioutil.ReadAll(os.Stdin)
-	} else {
-		src, err = ioutil.ReadFile(filename)
-	}
-	if err != nil {
-		fmt.Fprint(os.Stderr, err)
-		setExitCode(1)
-		return
-	}
-
-	src, changedFile, err := processFile(src, filename)
-	if err != nil {
-		scanner.PrintError(os.Stderr, err)
-		setExitCode(1)
-		return
-	}
-	res := src
-	if changedFile != nil {
-		var buf bytes.Buffer
-		err := format.Node(&buf, fset, changedFile)
-		if err != nil {
-			fmt.Fprint(os.Stderr, err)
-			setExitCode(1)
-			return
-		}
-		res = buf.Bytes()
-	}
-	err = writeOutput(out, src, res, filename)
-	if err != nil {
-		fmt.Fprint(os.Stderr, err)
-		setExitCode(1)
-		return
-	}
-}
-
-func handleDir(p string) {
-	if err := filepath.Walk(p, func(path string, info os.FileInfo, err error) error {
-		if err != nil {
-			return err
-		}
-		if !isGoFile(info) {
-			return nil
-		}
-		handleFile(false, path, os.Stdout)
-		return nil
-	}); err != nil {
-		fmt.Fprint(os.Stderr, err)
-		setExitCode(1)
-	}
-}
-
-func writeOutput(out io.Writer, src, res []byte, filename string) error {
-	// Copied for processFile in cmd/gofmt.
-	if *list {
-		fmt.Fprintln(out, filename)
-	}
-	// TODO: filename can be gibberish like "<stdin>" here, but -w is not
-	// allowed for stdin in main, hence why this doesn't blow up. clean this
-	// up.
-	if *overwrite {
-		fi, err := os.Stat(filename)
-		if err != nil {
-			return err
-		}
-		perm := fi.Mode().Perm()
-		// make a temporary backup before overwriting original
-		bakname, err := backupFile(filename+".", src, perm)
-		if err != nil {
-			return err
-		}
-		err = ioutil.WriteFile(filename, res, perm)
-		if err != nil {
-			os.Rename(bakname, filename)
-			return err
-		}
-		err = os.Remove(bakname)
-		if err != nil {
-			return err
-		}
-	}
-	if *diff {
-		data, err := cmdDiff(src, res, filename)
-		if err != nil {
-			return fmt.Errorf("computing diff: %s", err)
-		}
-		fmt.Printf("diff -u %s %s\n", filepath.ToSlash(filename+".orig"), filepath.ToSlash(filename))
-		out.Write(data)
-	}
-	if !*list && !*overwrite && !*diff {
-		_, err := out.Write(res)
-		if err != nil {
-			return nil
-		}
-	}
-	return nil
-}
-
-func isGoFile(f os.FileInfo) bool {
-	// ignore non-Go files
-	name := f.Name()
-	return !f.IsDir() && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".go")
-}
-
 func parserMode() parser.Mode {
 	if *allErrors {
 		return parser.ParseComments | parser.AllErrors
@@ -565,8 +458,111 @@ func panicf(format string, v ...interface{}) {
 	panic(s)
 }
 
-func debugf(format string, v ...interface{}) {
-	fmt.Printf(format, v...)
+func handleFile(stdin bool, filename string, out io.Writer) {
+	var src []byte
+	var err error
+	if stdin {
+		src, err = ioutil.ReadAll(os.Stdin)
+	} else {
+		src, err = ioutil.ReadFile(filename)
+	}
+	if err != nil {
+		fmt.Fprint(os.Stderr, err)
+		setExitCode(1)
+		return
+	}
+
+	src, changedFile, err := processFile(src, filename)
+	if err != nil {
+		scanner.PrintError(os.Stderr, err)
+		setExitCode(1)
+		return
+	}
+	res := src
+	if changedFile != nil {
+		var buf bytes.Buffer
+		err := format.Node(&buf, fset, changedFile)
+		if err != nil {
+			fmt.Fprint(os.Stderr, err)
+			setExitCode(1)
+			return
+		}
+		res = buf.Bytes()
+	}
+	err = writeOutput(out, src, res, filename)
+	if err != nil {
+		fmt.Fprint(os.Stderr, err)
+		setExitCode(1)
+		return
+	}
+}
+
+func handleDir(p string) {
+	if err := filepath.Walk(p, func(path string, info os.FileInfo, err error) error {
+		if err != nil {
+			return err
+		}
+		if !isGoFile(info) {
+			return nil
+		}
+		handleFile(false, path, os.Stdout)
+		return nil
+	}); err != nil {
+		fmt.Fprint(os.Stderr, err)
+		setExitCode(1)
+	}
+}
+
+func writeOutput(out io.Writer, src, res []byte, filename string) error {
+	// Copied from processFile in cmd/gofmt.
+	if *list {
+		fmt.Fprintln(out, filename)
+	}
+	// TODO: filename can be gibberish like "<stdin>" here, but -w is not
+	// allowed for stdin in main, hence why this doesn't blow up. clean this
+	// up.
+	if *overwrite {
+		fi, err := os.Stat(filename)
+		if err != nil {
+			return err
+		}
+		perm := fi.Mode().Perm()
+		// make a temporary backup before overwriting original
+		bakname, err := backupFile(filename+".", src, perm)
+		if err != nil {
+			return err
+		}
+		err = ioutil.WriteFile(filename, res, perm)
+		if err != nil {
+			os.Rename(bakname, filename)
+			return err
+		}
+		err = os.Remove(bakname)
+		if err != nil {
+			return err
+		}
+	}
+	if *diff {
+		data, err := cmdDiff(src, res, filename)
+		if err != nil {
+			return fmt.Errorf("computing diff: %s", err)
+		}
+		fmt.Printf("diff -u %s %s\n", filepath.ToSlash(filename+".orig"), filepath.ToSlash(filename))
+		out.Write(data)
+	}
+	if !*list && !*overwrite && !*diff {
+		_, err := out.Write(res)
+		if err != nil {
+			return nil
+		}
+	}
+	return nil
+}
+
+func isGoFile(f os.FileInfo) bool {
+	// ignore non-Go files
+	name := f.Name()
+	return !f.IsDir() && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".go")
 }
 
 // ----------------------------------------------------------------------------
