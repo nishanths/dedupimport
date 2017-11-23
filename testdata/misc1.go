@@ -44,7 +44,7 @@ func (b *Bar) method(argc, _ int, argv ...string) bool {
 
 type Bar struct {}
 
-func foo() {
+func foo(xxxxxx int, fmt string, /*f string*/) {
 	_ = f
 	_ = fmt.Println
 	_ = Printf
@@ -56,10 +56,12 @@ func foo() {
 
 	type X struct {}
 
-	lit := func(a int) bool { return true }
+	lit := func(a int, enc json.Encoder) bool { return true }
 
 	{
 		var f int
+		var math int
+		_ = math.Sin
 		titanic := 3
 		type T struct {}
 		_ = t.Sin

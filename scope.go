@@ -5,6 +5,74 @@ import (
 	"go/token"
 )
 
+type Scope struct {
+	node   ast.Node
+	outer  *Scope
+	inner  []*Scope
+	idents map[string]*ast.Ident
+	done   bool // completed "parsing" this scope; exists to guard against programmer error
+}
+
+func newScope(node ast.Node) *Scope {
+	sc := new(Scope)
+	sc.node = node
+	return sc
+}
+
+func (sc *Scope) assertDone() {
+	if !sc.done {
+		panicf("scope not done")
+	}
+}
+
+func (sc *Scope) markDone() {
+	if sc.done {
+		panicf("scope already done")
+	}
+	sc.done = true
+}
+
+func (sc *Scope) addIdent(ident *ast.Ident) {
+	if sc.idents == nil {
+		sc.idents = make(map[string]*ast.Ident)
+	}
+	sc.idents[ident.Name] = ident
+}
+
+// declared returns whether the named identifier
+// is declared in this scope.
+func (sc *Scope) declared(name string) bool {
+	sc.assertDone()
+	_, ok := sc.idents[name]
+	return ok
+}
+
+// available returns whether the named identifier is
+// delcared in this scope or any of the outer scopes.
+func (sc *Scope) available(name string) bool {
+	for c := sc; c != nil; c = c.outer {
+		if c.declared(name) {
+			return true
+		}
+	}
+	return false
+}
+
+// traverse walks the scope in breadth first order.
+func (sc *Scope) traverse(fn func(*Scope) bool) {
+	q := []*Scope{sc}
+	for len(q) != 0 {
+		var c *Scope
+		c, q = q[0], q[1:]
+		if !fn(c) {
+			break
+		}
+		for _, in := range c.inner {
+			q = append(q, in)
+		}
+	}
+}
+
 // Notes
 // -----
 //
@@ -154,6 +222,7 @@ func walkBlockStmt(x *ast.BlockStmt) *Scope {
 			if x == xx {
 				// Skip original argument to Inspect.
 				// It should have been handled by the caller.
+				// TODO: feels hacky? find a better place for this.
 				return true
 			}
 			inner := walkBlockStmt(xx)
