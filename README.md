@@ -1,7 +1,6 @@
 ## dupeimport
 
-Remove duplicate imports in Go source files that are imported using
-different names.
+Remove duplicate imports that have been imported using different names.
 
 ```
 go get -u github.com/nishanths/dupeimport
@@ -9,7 +8,7 @@ go get -u github.com/nishanths/dupeimport
 usage: dupeimport [flags] [path ...]
   dupeimport file1.go file2.go dir
   dupeimport -w file1.go        # overwrite source file
-  dupeimport -s named file1.go  # keep the named import
+  dupeimport -s named file1.go  # when resolving duplicate imports, keep the shortest named import
   dupeimport -h                 # help
 ```
 

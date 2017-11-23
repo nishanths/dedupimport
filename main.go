@@ -12,10 +12,10 @@
 //
 // The typical usage is:
 //
-//   dupeimport file1.go dir1 dir2 # print updated files to stdout
-//   dupeimport -w file.go         # overwrite source file
+//   dupeimport file1.go dir1 dir2 # prints updated versions to stdout
+//   dupeimport -w file.go         # overwrite original source file
 //   dupeimport -d file.go         # display diff
-//   dupeimport -l dir             # list files with duplicate imports
+//   dupeimport -l file.go dir     # list the filenames that have duplicate imports
 //
 // Strategy to use when resolving duplicates
 //
@@ -32,10 +32,13 @@
 //
 // Rewriting
 //
-// Sometimes rewriting a file to use the updated import declaration could
-// lead to build errors. For example, it is not possible to safely change
-// "u" -> "url" inside fetch because the identifier, url, already exists in
-// the scope.
+// Sometimes rewriting a file to use the updated import declaration can be
+// unsafe. In the following example, it is not possible to safely change "u"
+// -> "url" inside fetch because the identifier, url, already exists in the
+// scope.
+//
+// Such contrived scenarios rarely happen in practice.  But if they do, the
+// command prints a warning and skips the file.
 //
 //   import u "net/url"
 //   import "net/url"
@@ -47,17 +50,14 @@
 //      ...
 //   }
 //
-// Such contrived scenarios rarely arise in practice.  But if they do, the
-// command prints a warning and skips the file.
-//
 // Package names
 //
 // For unnamed imports, the command guesses at the package name by looking
-// at the import path. Typically the package name is the same as the
-// basename of the import path, but not always. The command automatically
-// automatically handles these patterns:
+// at the import path. The package name is, in most cases, the basename of
+// the import path. The command automatically automatically handles these
+// patterns:
 //
-//   Import path                            Package name    Note
+//   Import path                            Package name    Notes
 //   -----------------                      ------------    ---------------
 //   github.com/foo/bar                     bar             Standard naming
 //   gopkg.in/yaml.v2                       yaml            Remove version
@@ -66,8 +66,10 @@
 //   github.com/nishanths/lyft-go           lyft            Remove 'go' suffix
 //
 // To instruct the command on how to handle more complicated patterns, the
-// '-m' flag can be used. The flag can be repeated multiple times to specify
-// multipe mappings. For example:
+// '-m' flag can be used. The format for the flag is:
+//   importpath=packagename
+// The flag can be repeated multiple times to specify multiple mappings. For
+// example:
 //
 //   dupeimport -m github.com/proj/serverimpl=server \
 //     -m github.com/priarie/go-k8s-client=clientk8s
