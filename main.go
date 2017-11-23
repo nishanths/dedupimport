@@ -193,10 +193,10 @@ func parserMode() parser.Mode {
 	return parser.ParseComments
 }
 
-func processFile(fset *token.FileSet, src []byte, filename string) ([]byte, *ast.File, error) {
+func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, error) {
 	file, err := parser.ParseFile(fset, filename, src, parserMode())
 	if err != nil {
-		return src, nil, err
+		return nil, err
 	}
 
 	// find duplicate imports.
@@ -211,7 +211,7 @@ func processFile(fset *token.FileSet, src []byte, filename string) ([]byte, *ast
 	}
 	if len(remove) == 0 {
 		// nothing to do
-		return src, nil, nil
+		return nil, nil
 	}
 
 	cmap := ast.NewCommentMap(fset, file, file.Comments)
@@ -243,13 +243,13 @@ func processFile(fset *token.FileSet, src []byte, filename string) ([]byte, *ast
 
 		err := rewriteSelectorExprs(fset, rules, scope)
 		if err != nil {
-			return src, nil, err
+			return nil, err
 		}
 	}
 
 	ast.SortImports(fset, file)
 
-	return src, file, nil
+	return file, nil
 }
 
 // rewriteSelectorExprs rewrites selector exprs in the supplied scope based
@@ -523,7 +523,7 @@ func guessPackageName_(p string, again bool) string {
 		return p
 	}
 
-	last := p[sidx:]
+	last := p[sidx+1:]
 
 	// Order matters. For instance, the .vn check should happen before the
 	// "go-" prefix check.
@@ -572,7 +572,8 @@ func handleFile(fset *token.FileSet, stdin bool, filename string, out io.Writer)
 		return
 	}
 
-	src, changedFile, err := processFile(fset, src, filename)
+	// Keep the following in sync with test code.
+	changedFile, err := processFile(fset, src, filename)
 	if err != nil {
 		scanner.PrintError(os.Stderr, err)
 		setExitCode(1)
