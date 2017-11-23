@@ -6,7 +6,7 @@ import (
 	f "fmt"
 )
 
-import m `math`
+import m `math` // to do math things
 import fm "fmt"
 import l "math"
 

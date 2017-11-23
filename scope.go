@@ -6,11 +6,11 @@ import (
 )
 
 type Scope struct {
-	node   ast.Node
-	outer  *Scope
-	inner  []*Scope
-	idents map[string]*ast.Ident
-	done   bool // completed "parsing" this scope; exists to guard against programmer error
+	node   ast.Node              // the underlying node that defines this scope (*ast.File, *ast.FuncDecl, *ast.BlockStmt, *ast.FuncLit)
+	outer  *Scope                // parent scope, or nil if this is the file scope
+	inner  []*Scope              // immediate inner scopes
+	idents map[string]*ast.Ident // idents in this scope; the key is the name of the ident for fast lookup
+	done   bool                  // completed "parsing" this scope; exists to guard against programmer error
 }
 
 func newScope(node ast.Node) *Scope {
@@ -21,13 +21,13 @@ func newScope(node ast.Node) *Scope {
 
 func (sc *Scope) assertDone() {
 	if !sc.done {
-		panicf("scope not done")
+		panic("scope not done")
 	}
 }
 
 func (sc *Scope) markDone() {
 	if sc.done {
-		panicf("scope already done")
+		panic("scope already done")
 	}
 	sc.done = true
 }
@@ -50,6 +50,7 @@ func (sc *Scope) declared(name string) bool {
 // available returns whether the named identifier is
 // delcared in this scope or any of the outer scopes.
 func (sc *Scope) available(name string) bool {
+	sc.assertDone()
 	for c := sc; c != nil; c = c.outer {
 		if c.declared(name) {
 			return true

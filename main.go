@@ -52,7 +52,7 @@ var (
 	list       = flag.Bool("l", false, "list files with duplicate imports")
 	overwrite  = flag.Bool("w", false, "write result to source file instead of stdout")
 	importOnly = flag.Bool("i", false, "only modify imports; don't adjust rest of the file")
-	strategy   = flag.String("s", "unnamed", "`kind` of import to keep: first, named, or unnamed")
+	strategy   = flag.String("s", "unnamed", "`kind` of import to keep: first, comment, named, or unnamed")
 	pkgNames   = make(MultiFlag)
 )
 
@@ -74,10 +74,17 @@ func main() {
 	flag.Usage = usage
 	flag.Parse()
 
+	switch *strategy {
+	case "first", "comment", "named", "unnamed":
+	default:
+		fmt.Fprintf(os.Stderr, "unknown value for -s: %s\n", *strategy)
+		os.Exit(2)
+	}
+
 	if flag.NArg() == 0 {
 		if *overwrite {
 			fmt.Fprint(os.Stderr, "cannot use -w with stdin\n")
-			setExitCode(2)
+			os.Exit(2)
 		} else {
 			handleFile(true, "<standard input>", os.Stdout) // use the same filename that gofmt uses
 		}
@@ -129,11 +136,18 @@ func processFile(src []byte, filename string) ([]byte, *ast.File, error) {
 		return src, nil, nil
 	}
 
+	// ast.Print(fset, file)
+
+	cmap := ast.NewCommentMap(fset, file, file.Comments)
+
 	// update the file's imports.
 	file.Imports = keep
 
 	// update the file's AST.
 	trimImportDecls(file)
+
+	// get rid of comments that no longer belong.
+	file.Comments = cmap.Filter(file).Comments()
 
 	if !*importOnly {
 		// get the identifiers in scopes.
@@ -203,7 +217,7 @@ func rewriteSelectorExprs(rules map[string]string, root *Scope) error {
 				panicf("[code bug] selector expr should be in a scope, but unaware of any such scope")
 			}
 			if latest.available(to) {
-				addError(fmt.Errorf("%s: cannot rewrite %s -> %s: identifier %[3]s in scope does not refer to the import",
+				addError(fmt.Errorf("%s: cannot rewrite %s -> %s: identifier %[3]s in scope does not refer to the imported package",
 					fset.Position(x.X.Pos()), ident.Name, to))
 				return false
 			}
@@ -321,6 +335,8 @@ func markDuplicates(input []*ast.ImportSpec) []*ImportSpec {
 	}
 
 	for _, v := range duplicateImportPaths {
+		var keepIdx int
+
 		switch *strategy {
 		case "unnamed":
 			// Find the index of the first unnamed import.
@@ -332,22 +348,28 @@ func markDuplicates(input []*ast.ImportSpec) []*ImportSpec {
 					break
 				}
 			}
-			keepIdx := idx
+			keepIdx = idx
 			if keepIdx == -1 {
 				// no unnamed import exists. fall back to keeping
 				// the first one.
 				keepIdx = 0
 			}
-			for i := 0; i < len(v); i++ {
-				if i != keepIdx {
-					v[i].remove = true
-					v[i].subsumedBy = v[keepIdx].spec
+		case "first":
+			keepIdx = 0
+		case "comment":
+			// Find the index of the first import with either a doc comment
+			// or line comment.
+			idx := -1
+			for i := range v {
+				if v[i].spec.Comment != nil || v[i].spec.Doc != nil {
+					idx = i
+					break
 				}
 			}
-		case "first":
-			for i := 1; i < len(v); i++ {
-				v[i].remove = true
-				v[i].subsumedBy = v[0].spec
+			keepIdx = idx
+			if keepIdx == -1 {
+				// use first one.
+				keepIdx = 0
 			}
 		case "named":
 			// Find the shortest named import.
@@ -361,17 +383,19 @@ func markDuplicates(input []*ast.ImportSpec) []*ImportSpec {
 					length = len(v[i].spec.Name.Name)
 				}
 			}
-			keepIdx := idx
+			keepIdx = idx
 			if keepIdx == -1 {
 				// no named import existed at all.
 				// fall back to keeping the first one.
 				keepIdx = 0
 			}
-			for i := 0; i < len(v); i++ {
-				if i != keepIdx {
-					v[i].remove = true
-					v[i].subsumedBy = v[keepIdx].spec
-				}
+		}
+
+		// mark imports for removal
+		for i := 0; i < len(v); i++ {
+			if i != keepIdx {
+				v[i].remove = true
+				v[i].subsumedBy = v[keepIdx].spec
 			}
 		}
 	}
