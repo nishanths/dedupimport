@@ -47,12 +47,13 @@ func (m MultiFlag) Set(val string) error {
 }
 
 var (
-	diff      = flag.Bool("d", false, "display diff instead of rewriting files")
-	allErrors = flag.Bool("e", false, "report all parse errors, not just the first 10 on different lines")
-	list      = flag.Bool("l", false, "list files with duplicate imports")
-	overwrite = flag.Bool("w", false, "write result to source file instead of stdout")
-	strategy  = flag.String("s", "unnamed", "`kind` of import to keep: first, named, or unnamed")
-	pkgNames  = make(MultiFlag)
+	diff       = flag.Bool("d", false, "display diff instead of rewriting files")
+	allErrors  = flag.Bool("e", false, "report all parse errors, not just the first 10 on different lines")
+	list       = flag.Bool("l", false, "list files with duplicate imports")
+	overwrite  = flag.Bool("w", false, "write result to source file instead of stdout")
+	importOnly = flag.Bool("i", false, "only modify imports; don't adjust rest of the file")
+	strategy   = flag.String("s", "unnamed", "`kind` of import to keep: first, named, or unnamed")
+	pkgNames   = make(MultiFlag)
 )
 
 var exitCode = 0
@@ -69,7 +70,7 @@ func setExitCode(c int) {
 var fset = token.NewFileSet()
 
 func main() {
-	flag.Var(&pkgNames, "p", "`mapping` from import path to package name; can be specified multiple times")
+	flag.Var(&pkgNames, "m", "`mapping` from import path to package name; can be specified multiple times")
 	flag.Usage = usage
 	flag.Parse()
 
@@ -120,17 +121,17 @@ func handleFile(stdin bool, filename string, out io.Writer) {
 		setExitCode(1)
 		return
 	}
-	if changedFile == nil {
-		return
+	res := src
+	if changedFile != nil {
+		err := format.Node(&buf, fset, changedFile)
+		if err != nil {
+			fmt.Fprint(os.Stderr, err)
+			setExitCode(1)
+			return
+		}
+		res := buf.Bytes()
 	}
-	var buf bytes.Buffer
-	err = format.Node(&buf, fset, changedFile)
-	if err != nil {
-		fmt.Fprint(os.Stderr, err)
-		setExitCode(1)
-		return
-	}
-	err = writeOutput(out, src, buf.Bytes(), filename)
+	err = writeOutput(out, src, res, filename)
 	if err != nil {
 		fmt.Fprint(os.Stderr, err)
 		setExitCode(1)
@@ -240,24 +241,26 @@ func processFile(src []byte, filename string) ([]byte, *ast.File, error) {
 	// update the file's AST.
 	trimImportDecls(file)
 
-	// get the identifiers in scopes.
-	// we need it to check if rewriting selector exprs is safe.
-	scope := walkFile(file)
+	if !*importOnly {
+		// get the identifiers in scopes.
+		// we need it to check if rewriting selector exprs is safe.
+		scope := walkFile(file)
 
-	// build up the selector expr rewrite rules.
-	rules := make(map[string]string)
-	for _, im := range imports {
-		if !im.remove {
-			continue
+		// build up the selector expr rewrite rules.
+		rules := make(map[string]string)
+		for _, im := range imports {
+			if !im.remove {
+				continue
+			}
+			from := packageNameForImport(im.spec)
+			to := packageNameForImport(im.subsumedBy)
+			rules[from] = to
 		}
-		from := packageNameForImport(im.spec)
-		to := packageNameForImport(im.subsumedBy)
-		rules[from] = to
-	}
 
-	err = rewriteSelectorExprs(rules, scope)
-	if err != nil {
-		return src, nil, err
+		err := rewriteSelectorExprs(rules, scope)
+		if err != nil {
+			return src, nil, err
+		}
 	}
 
 	ast.SortImports(fset, file)
@@ -306,7 +309,7 @@ func rewriteSelectorExprs(rules map[string]string, root *Scope) error {
 				panicf("[code bug] selector expr should be in a scope, but unaware of any such scope")
 			}
 			if latest.available(to) {
-				addError(fmt.Errorf("%s: cannot rewrite %s->%s: identifier %[3]s in scope does not refer to the import",
+				addError(fmt.Errorf("%s: cannot rewrite %s -> %s: identifier %[3]s in scope does not refer to the import",
 					fset.Position(x.X.Pos()), ident.Name, to))
 				return false
 			}
