@@ -2,6 +2,7 @@ package main
 
 import (
 	"bytes"
+	"fmt"
 	"go/format"
 	"go/scanner"
 	"go/token"
@@ -28,14 +29,57 @@ got:  %s
 	}
 }
 
+func parseFlags(p string) {
+	// Get the first line.
+	b, err := ioutil.ReadFile(p)
+	if err != nil {
+		panic(fmt.Sprintf("failed to read file: %s", p))
+	}
+	idx := bytes.IndexByte(b, '\n')
+	if idx == -1 {
+		panic(fmt.Sprintf("no lines in file: %s", p))
+	}
+	// Does it have the prefix?
+	const prefix = "//dupeimport"
+	line := string(b[:idx])
+	if !strings.HasPrefix(line, prefix) {
+		return
+	} else {
+		line = strings.TrimPrefix(line, prefix)
+	}
+	// Parse.
+	args := strings.Fields(line)
+	for i := 0; i < len(args); {
+		arg := args[i]
+		switch arg {
+		case "-keep":
+			i++
+			*strategy = args[i]
+		default:
+			panic("unhandled flag")
+		}
+		i++
+	}
+}
+
+func resetFlags() {
+	*strategy = "unnamed"
+}
+
 func TestAll(t *testing.T) {
 	fset := token.NewFileSet() // use the same fset
-	filenames := []string{"testdata/cannot.go", "testdata/example.go"}
+	filenames := []string{
+		"testdata/cannot.go",
+		"testdata/example.go",
+		"testdata/comment.go",
+	}
 
 	for i, path := range filenames {
 		if testing.Verbose() {
 			t.Logf("testing file [%d]: %s", i, path)
 		}
+		resetFlags()
+		parseFlags(path)
 		runOneFile(t, fset, path)
 	}
 }
