@@ -3,12 +3,17 @@
 //
 // When resolving duplicate imports, by default, it keeps the unnamed import
 // and removes the named imports. This behavior can be customized with the
-// '-s' flag (described below). After resolving duplicates it updates code
-// using the old, duplicate import identifier to use the new, single import.
+// '-keep' flag (described below). After resolving duplicates it updates the
+// rest of the code in the file that may be using the old, removed import
+// identifier to use the new import identifier.
 //
 // As a special case, the tool never removes side-effect imports ("_") and
 // dot imports ("."); these imports are allowed to coexist with regular
 // imports, even if the import paths are duplicated.
+//
+// The command exits with exit code 2 if the command was invoked incorrectly;
+// 1 if there was an error while opening, parsing, or rewriting files; and
+// 0 otherwise.
 //
 // The typical usage is:
 //
@@ -19,23 +24,23 @@
 //
 // Strategy to use when resolving duplicates
 //
-// The '-s' flag allows you to choose which import to keep and which ones to
-// remove when resolving duplicates in a file:
+// The '-keep' flag allows you to choose which import to keep and which ones to
+// remove when resolving duplicates in a file, aka the strategy to use:
 //
-//   - The "unnamed" option keeps the unnamed import if one exists, or the
+//   - the "unnamed" strategy keeps the unnamed import if one exists, or the
 //     first import otherwise;
-//   - The "named" option keeps the first-occuring shortest named import if
+//   - the "named" strategy keeps the first-occuring shortest named import if
 //     one exists, or the first import otherwise;
-//   - The "comment" option keeps the import with a doc or a line comment if
+//   - the "comment" strategy keeps the import with a doc or a line comment if
 //     one exists, or the first import otherwise; and
-//   - The "first" option keeps the first import.
+//   - the "first" strategy keeps the first import.
 //
-// Rewriting
+// Inability to rewrite
 //
 // Sometimes rewriting a file to use the updated import declaration can be
 // unsafe. In the following example, it is not possible to safely change "u"
 // -> "url" inside fetch because the identifier, url, already exists in the
-// scope.
+// scope and does not refer to the import.
 //
 // Such contrived scenarios rarely happen in practice.  But if they do, the
 // command prints a warning and skips the file.
@@ -54,16 +59,16 @@
 //
 // For unnamed imports, the command guesses at the package name by looking
 // at the import path. The package name is, in most cases, the basename of
-// the import path. The command automatically automatically handles these
-// patterns:
+// the import path. The command automatically handles patterns such as
+// these:
 //
 //   Import path                            Package name    Notes
 //   -----------------                      ------------    ---------------
 //   github.com/foo/bar                     bar             Standard naming
 //   gopkg.in/yaml.v2                       yaml            Remove version
 //   k8s.io/apimachinery/pkg/apis/meta/v1   meta            Remove version
-//   github.com/nishanths/go-xkcd           xkcd            Remove 'go' prefix
-//   github.com/nishanths/lyft-go           lyft            Remove 'go' suffix
+//   github.com/nishanths/go-xkcd           xkcd            Remove 'go-' prefix
+//   github.com/nishanths/lyft-go           lyft            Remove '-go' suffix
 //
 // To instruct the command on how to handle more complicated patterns, the
 // '-m' flag can be used. The format for the flag is:
@@ -134,7 +139,7 @@ var (
 	list       = flagSet.Bool("l", false, "list files with duplicate imports")
 	overwrite  = flagSet.Bool("w", false, "write result to source file instead of stdout")
 	importOnly = flagSet.Bool("i", false, "only modify imports; don't adjust rest of the file")
-	strategy   = flagSet.String("s", "unnamed", "`kind` of import to keep: first, comment, named, or unnamed")
+	strategy   = flagSet.String("keep", "unnamed", "which import to keep: first, comment, named, or unnamed")
 	pkgNames   = MultiFlag{name: "m"}
 )
 
@@ -154,7 +159,7 @@ func main() {
 	switch *strategy {
 	case "first", "comment", "named", "unnamed":
 	default:
-		fmt.Fprintf(os.Stderr, "unknown value for -s: %s\n", *strategy)
+		fmt.Fprintf(os.Stderr, "unknown value for -keep: %s\n", *strategy)
 		os.Exit(2)
 	}
 
