@@ -1,3 +1,71 @@
+// Command dupeimport finds and removes duplicate imports in Go source
+// files. See 'dupeimport -h' for usage.
+//
+// When resolving duplicate imports, by default, it keeps the unnamed import
+// and removes the named imports. This behavior can be customized with the
+// '-s' flag (described below). After resolving duplicates it updates code
+// to using the old, duplicate import identifier to use the single, new one.
+//
+// As a special case, the tool never removes side-effect imports ("_") and
+// dot imports ("."); these imports are allowed to coexist with regular
+// imports, even if the import paths are duplicated.
+//
+// The typical usage is:
+//
+//   dupeimport file1.go dir1 dir2 # print to stdout
+//   dupeimport -w file.go         # overwrite source file
+//   dupeimport -d file.go         # display diff
+//   dupeimport -l dir             # list files with duplicate imports
+//
+// Strategies to resolve duplicates
+//
+// The '-s' flag allows you to choose which import to keep and which ones to
+// remove when resolving duplicates in a file:
+//
+//   - The "unnamed" option keeps the unnamed import if one exists, or the
+//     first import otherwise;
+//   - The "named" option keeps the first-occuring shortest named import if
+//     one exists, or the first import otherwise;
+//   - The "comment" option keeps the import with a doc or a line comment if
+//     one exists, or the first import otherwise; and
+//   - The "first" option keeps the first import.
+//
+// Rewriting
+//
+// Sometimes rewriting a file to use the updated import declaration could
+// lead to build errors. For example, it is not possible to safely change
+// "u" -> "url" in Parse because the identifier, url, already exists in the scope.
+//
+//   import u "net/url"
+//
+//   func fetch(url string) {
+//      u.Parse(url)
+//      ...
+//   }
+//
+// Such contrived scenarios rarely arise in practice.  But if they do, the
+// command prints a warning and skips rewriting the file.
+//
+// Package names
+//
+// The command is often required to guess at the package identifier for
+// unnamed imports when rewriting the source AST. Typically this is the same
+// as the basename of the import path, but not always. The command can
+// handle automatically handle these common patterns:
+//
+//   Import path                            Package name    Note
+//   ------------                           ------------    -------------
+//   github.com/foo/bar                     bar             Standard naming
+//   gopkg.in/yaml.v2                       yaml            Remove version
+//   k8s.io/apimachinery/pkg/apis/meta/v1   meta            Remove version
+//   github.com/nishanths/go-xkcd           xkcd            Remove 'go' prefix or suffix
+//
+// To instruct the command on how to handle more complicated patterns, the
+// '-m' flag can be used. The flag can be repeated multiple times to specify
+// multipe mappings. For example:
+//
+//   dupeimport -m github.com/proj/serverimpl=server \
+//              -m github.com/priarie/go-k8s-client=clientk8s
 package main
 
 import (
