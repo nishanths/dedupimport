@@ -144,11 +144,6 @@ func setExitCode(c int) {
 	}
 }
 
-// fset is the FileSet for the entire command invocation.
-// It's global so that things that need to get positions can do so without
-// passing it around as an arg.
-var fset = token.NewFileSet()
-
 func main() {
 	flagSet.Var(&pkgNames, "m", "`mapping` from import path to package name; can be repeated")
 	flagSet.Usage = usage
@@ -161,12 +156,15 @@ func main() {
 		os.Exit(2)
 	}
 
+	// fset is the FileSet for the entire command invocation.
+	var fset = token.NewFileSet()
+
 	if flagSet.NArg() == 0 {
 		if *overwrite {
 			fmt.Fprint(os.Stderr, "cannot use -w with stdin\n")
 			os.Exit(2)
 		} else {
-			handleFile(true, "<standard input>", os.Stdout) // use the same filename that gofmt uses
+			handleFile(fset, true, "<standard input>", os.Stdout) // use the same filename that gofmt uses
 		}
 	} else {
 		for i := 0; i < flagSet.NArg(); i++ {
@@ -176,9 +174,9 @@ func main() {
 				fmt.Fprint(os.Stderr, err)
 				setExitCode(1)
 			} else if info.IsDir() {
-				handleDir(path)
+				handleDir(fset, path)
 			} else {
-				handleFile(false, path, os.Stdout)
+				handleFile(fset, false, path, os.Stdout)
 			}
 		}
 	}
@@ -195,7 +193,7 @@ func parserMode() parser.Mode {
 	return parser.ParseComments
 }
 
-func processFile(src []byte, filename string) ([]byte, *ast.File, error) {
+func processFile(fset *token.FileSet, src []byte, filename string) ([]byte, *ast.File, error) {
 	file, err := parser.ParseFile(fset, filename, src, parserMode())
 	if err != nil {
 		return src, nil, err
@@ -215,8 +213,6 @@ func processFile(src []byte, filename string) ([]byte, *ast.File, error) {
 		// nothing to do
 		return src, nil, nil
 	}
-
-	// ast.Print(fset, file)
 
 	cmap := ast.NewCommentMap(fset, file, file.Comments)
 
@@ -245,7 +241,7 @@ func processFile(src []byte, filename string) ([]byte, *ast.File, error) {
 			rules[from] = to
 		}
 
-		err := rewriteSelectorExprs(rules, scope)
+		err := rewriteSelectorExprs(fset, rules, scope)
 		if err != nil {
 			return src, nil, err
 		}
@@ -260,7 +256,7 @@ func processFile(src []byte, filename string) ([]byte, *ast.File, error) {
 // on the rewrite rules. If a rewrite could not be performed, it will be
 // described in the returned error. The returned error will be of type
 // RewriteError (even if there was only a single error).
-func rewriteSelectorExprs(rules map[string]string, root *Scope) error {
+func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Scope) error {
 	// first, map nodes to their scopes.
 	scopeByNode := make(map[ast.Node]*Scope)
 	root.traverse(func(s *Scope) bool {
@@ -562,7 +558,7 @@ func panicf(format string, v ...interface{}) {
 	panic(s)
 }
 
-func handleFile(stdin bool, filename string, out io.Writer) {
+func handleFile(fset *token.FileSet, stdin bool, filename string, out io.Writer) {
 	var src []byte
 	var err error
 	if stdin {
@@ -576,7 +572,7 @@ func handleFile(stdin bool, filename string, out io.Writer) {
 		return
 	}
 
-	src, changedFile, err := processFile(src, filename)
+	src, changedFile, err := processFile(fset, src, filename)
 	if err != nil {
 		scanner.PrintError(os.Stderr, err)
 		setExitCode(1)
@@ -601,7 +597,7 @@ func handleFile(stdin bool, filename string, out io.Writer) {
 	}
 }
 
-func handleDir(p string) {
+func handleDir(fset *token.FileSet, p string) {
 	if err := filepath.Walk(p, func(path string, info os.FileInfo, err error) error {
 		if err != nil {
 			return err
@@ -609,7 +605,7 @@ func handleDir(p string) {
 		if !isGoFile(info) {
 			return nil
 		}
-		handleFile(false, path, os.Stdout)
+		handleFile(fset, false, path, os.Stdout)
 		return nil
 	}); err != nil {
 		fmt.Fprint(os.Stderr, err)
