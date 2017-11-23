@@ -123,13 +123,14 @@ func handleFile(stdin bool, filename string, out io.Writer) {
 	}
 	res := src
 	if changedFile != nil {
+		var buf bytes.Buffer
 		err := format.Node(&buf, fset, changedFile)
 		if err != nil {
 			fmt.Fprint(os.Stderr, err)
 			setExitCode(1)
 			return
 		}
-		res := buf.Bytes()
+		res = buf.Bytes()
 	}
 	err = writeOutput(out, src, res, filename)
 	if err != nil {
