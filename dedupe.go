@@ -59,6 +59,229 @@ func parserMode() parser.Mode {
 	return parser.ParseComments
 }
 
+type Scope struct {
+	// TODO: keep a fileset here for better positioning?
+	node   ast.Node
+	outer  *Scope
+	inner  []*Scope
+	idents map[string]*ast.Ident
+	done   bool // completed "parsing" this scope?
+}
+
+func newScope(node ast.Node) *Scope {
+	sc := new(Scope)
+	sc.node = node
+	return sc
+}
+
+func (sc *Scope) assertDone() {
+	if !sc.done {
+		panicf("scope not done")
+	}
+}
+
+func (sc *Scope) markDone() {
+	if sc.done {
+		panicf("scope already done")
+	}
+	sc.done = true
+}
+
+func (sc *Scope) addIdent(ident *ast.Ident) {
+	if sc.idents == nil {
+		sc.idents = make(map[string]*ast.Ident)
+	}
+	sc.idents[ident.Name] = ident
+}
+
+// delcared returns whether the named identifier
+// is declared in this scope.
+func (sc *Scope) declared(name string) bool {
+	if sc == nil {
+		return false
+	}
+	sc.assertDone()
+	_, ok := sc.idents[name]
+	return ok
+}
+
+// available returns whether the named identifier is
+// delcared in this scope or any of the outer scopes.
+func (sc *Scope) available(name string) bool {
+	if sc == nil {
+		return false
+	}
+	for c := sc; c != nil; c = sc.outer {
+		if c.declared(name) {
+			return true
+		}
+	}
+	return false
+}
+
+// Notes
+// -----
+//
+// https://golang.org/ref/spec#Declarations_and_scope
+// Go is lexically scoped using blocks:
+// 1. The scope of a predeclared identifier is the universe block.
+// 2. The scope of an identifier denoting a constant, type, variable, or
+//    function (but not method) declared at top level (outside any function) is
+//    the package block.
+// 3. The scope of the package name of an imported package is the file block
+//    of the file containing the import declaration.
+// 4. The scope of an identifier denoting a method receiver, function
+//    parameter, or result variable is the function body.
+// 5. The scope of a constant or variable identifier declared inside a
+//    function begins at the end of the ConstSpec or VarSpec (ShortVarDecl for
+//    short variable declarations) and ends at the end of the innermost
+//    containing block.
+// 6. The scope of a type identifier declared inside a function begins at the
+//    identifier in the TypeSpec and ends at the end of the innermost containing
+//    block.
+
+func walkFile(file *ast.File) *Scope {
+	cur := newScope(file)
+
+	ast.Inspect(file, func(node ast.Node) bool {
+		switch x := node.(type) {
+		case *ast.ValueSpec:
+			for _, name := range x.Names {
+				cur.addIdent(name)
+			}
+			return false
+		case *ast.TypeSpec:
+			cur.addIdent(x.Name)
+			return false
+		case *ast.FuncDecl:
+			cur.addIdent(x.Name)
+			inner := walkFuncDecl(x)
+			cur.inner = append(cur.inner, inner)
+			inner.outer = cur
+			return false
+		}
+		return true
+	})
+
+	cur.markDone()
+	return cur
+}
+
+func walkFuncDecl(x *ast.FuncDecl) *Scope {
+	cur := newScope(x)
+
+	// add receivers idents
+	if x.Recv != nil {
+		for _, field := range x.Recv.List {
+			for _, name := range field.Names {
+				cur.addIdent(name)
+			}
+		}
+	}
+	// add params idents
+	for _, field := range x.Type.Params.List {
+		for _, name := range field.Names {
+			cur.addIdent(name)
+		}
+	}
+	// add returns idents
+	if x.Type.Results != nil {
+		for _, field := range x.Type.Results.List {
+			for _, name := range field.Names {
+				cur.addIdent(name)
+			}
+		}
+	}
+	// walk the body
+	if x.Body != nil {
+		blockScope := walkBlockStmt(x.Body)
+		cur.inner = append(cur.inner, blockScope)
+		blockScope.outer = cur
+	}
+
+	cur.markDone()
+	return cur
+}
+
+// walkFuncLit is similar to walkFuncDecl expect that it doesn't have
+// receivers.
+func walkFuncLit(x *ast.FuncLit) *Scope {
+	cur := newScope(x)
+
+	// add params idents
+	for _, field := range x.Type.Params.List {
+		for _, name := range field.Names {
+			cur.addIdent(name)
+		}
+	}
+	// add returns idents
+	if x.Type.Results != nil {
+		for _, field := range x.Type.Results.List {
+			for _, name := range field.Names {
+				cur.addIdent(name)
+			}
+		}
+	}
+	// walk the body
+	if x.Body != nil {
+		blockScope := walkBlockStmt(x.Body)
+		cur.inner = append(cur.inner, blockScope)
+		blockScope.outer = cur
+	}
+
+	cur.markDone()
+	return cur
+}
+
+func walkBlockStmt(x *ast.BlockStmt) *Scope {
+	cur := newScope(x)
+
+	ast.Inspect(x, func(node ast.Node) bool {
+		switch xx := node.(type) {
+		case *ast.ValueSpec:
+			for _, name := range xx.Names {
+				cur.addIdent(name)
+			}
+			return false
+		case *ast.FuncLit:
+			// unlike a FuncDecl, a FuncLit has no name,
+			// so there's nothing to ident to add to cur.
+			inner := walkFuncLit(xx)
+			cur.inner = append(cur.inner, inner)
+			inner.outer = cur
+			return false
+		case *ast.TypeSpec:
+			cur.addIdent(xx.Name)
+			return false
+		case *ast.AssignStmt:
+			// The Lhs contains the identifier.  We only care about short
+			// variable declarations, which use token.DEFINE.
+			if xx.Tok == token.DEFINE {
+				for _, expr := range xx.Lhs {
+					if ident, ok := expr.(*ast.Ident); ok {
+						cur.addIdent(ident)
+					}
+				}
+			}
+			return false
+		case *ast.BlockStmt:
+			if x == xx {
+				// Skip original argument to Inspect.
+				// It should have been handled by the caller.
+				return true
+			}
+			inner := walkBlockStmt(xx)
+			cur.inner = append(cur.inner, inner)
+			inner.outer = cur
+			return false
+		}
+		return true
+	})
+
+	cur.markDone()
+	return cur
+}
+
 // file set for the command invocation.
 var fset = token.NewFileSet()
 
@@ -73,15 +296,29 @@ func processFile(in io.Reader, out io.Writer, filename string, stdin bool) error
 		return err
 	}
 
-	res := dedupe(file.Imports)
+	// ast.Print(fset, file)
+	file.Imports = dedupe(file.Imports)
+	trimImportDecls(file)
 
-	resLookup := make(map[*ast.ImportSpec]struct{}, len(res))
-	for _, im := range res {
-		resLookup[im] = struct{}{}
+	scope := walkFile(file)
+	_ = scope
+
+	format.Node(os.Stdout, fset, file)
+	// ast.SortImports(fset, file)
+	// format.Node(os.Stdout, fset, file)
+
+	return nil
+}
+
+// trimImportDecls trims the file's import declarations based on the import
+// specifications still present in file.Imports.
+func trimImportDecls(file *ast.File) {
+	lookup := make(map[*ast.ImportSpec]struct{}, len(file.Imports))
+	for _, im := range file.Imports {
+		lookup[im] = struct{}{}
 	}
 
 	for i := range file.Decls {
-		// we only care about import declarations: they have the type GenDecl.
 		genDecl, ok := file.Decls[i].(*ast.GenDecl)
 		if !ok || genDecl.Tok != token.IMPORT {
 			continue
@@ -93,21 +330,20 @@ func processFile(in io.Reader, out io.Writer, filename string, stdin bool) error
 				// WTF, doesn't match godoc
 				panicf("expected ImportSpec")
 			}
-			if _, ok := resLookup[im]; ok {
+			if _, ok := lookup[im]; ok {
 				// was not removed during deduping.
 				trimmed = append(trimmed, spec)
 			}
 		}
 		genDecl.Specs = trimmed
 		file.Decls[i] = genDecl
-		// format.Node(os.Stdout, fset, file)
 	}
 
 	var nonEmptyDecls []ast.Decl
 	for _, decl := range file.Decls {
-		// we only care about import declarations: they have the type GenDecl.
 		genDecl, ok := decl.(*ast.GenDecl)
 		if !ok || genDecl.Tok != token.IMPORT {
+			nonEmptyDecls = append(nonEmptyDecls, decl)
 			continue
 		}
 		if len(genDecl.Specs) != 0 {
@@ -115,24 +351,6 @@ func processFile(in io.Reader, out io.Writer, filename string, stdin bool) error
 		}
 	}
 	file.Decls = nonEmptyDecls
-
-	// ast.Print(fset, file.Decls)
-	format.Node(os.Stdout, fset, file)
-
-	// fmt.Println(file.Decls[0].(*ast.GenDecl).Specs[0].(*ast.ImportSpec))
-	// fmt.Println(file.Imports[0])
-
-	// ast.Print(fset, file.Decls)
-	// TODO: need to associate back with GenDecl Tok=import
-
-	// ast.SortImports(fset, file)
-	// format.Node(os.Stdout, fset, file)
-	// ast.Print(fset, file)
-	// fmt.Println(file.Scope.Lookup("foo"))
-	// fmt.Println(file.Scope.Lookup("f"))
-	// fmt.Println(file.Scope.Lookup("p"))
-
-	return nil
 }
 
 // dedupe removes duplicate imports.
@@ -146,14 +364,16 @@ func dedupe(input []*ast.ImportSpec) []*ast.ImportSpec {
 	importPaths := make(map[string][]*ImportSpec)
 	for _, im := range imports {
 		spec := im.spec
-		// NOTE: the panics below indicate conditions that should have been
+		// NOTE: The panics below indicate conditions that should have been
 		// caught already by the parser.
 		if spec.Path.Kind != token.STRING {
 			panicf("import path %s is not a string", spec.Path.Value)
 		}
-		// skip dot imports. for now, let's assume it's okay to have both a
-		// dot import and a regular import.
-		if spec.Name != nil && spec.Name.Name == "." {
+		// skip dot and side effect imports. for now, let's assume it's okay
+		// to have both these coexist with regular imports. In fact, it looks
+		// like it's necessary to not remove _; that's the only way both _
+		// and regular import can be used together in a file.
+		if spec.Name != nil && (spec.Name.Name == "." || spec.Name.Name == "_") {
 			continue
 		}
 		// normalize `fmt` vs. "fmt", for instance
@@ -244,6 +464,10 @@ func removeImportSpec(a []*ast.ImportSpec, i int) []*ast.ImportSpec {
 }
 
 func panicf(format string, v ...interface{}) {
-	s := fmt.Sprintf(format, v)
+	s := fmt.Sprintf(format, v...)
 	panic(s)
+}
+
+func debugf(format string, v ...interface{}) {
+	fmt.Printf(format, v...)
 }

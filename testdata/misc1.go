@@ -35,8 +35,15 @@ import tt "math"
 import tt "crypto/sha1"
 import tt "crypto/sha256"
 
-// var f int
-	
+var fd int
+
+func (b *Bar) method(argc, _ int, argv ...string) bool {
+	x := true
+	return x
+}
+
+type Bar struct {}
+
 func foo() {
 	_ = f
 	_ = fmt.Println
@@ -46,4 +53,15 @@ func foo() {
 	_ = fm.Print
 	_ = math.Cos
 	_, _, _, _ = w.Tan, x.Tan, y.Tan, z.Tan
+
+	type X struct {}
+
+	lit := func(a int) bool { return true }
+
+	{
+		var f int
+		titanic := 3
+		type T struct {}
+		_ = t.Sin
+	}
 }
