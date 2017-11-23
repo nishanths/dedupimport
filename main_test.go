@@ -71,8 +71,16 @@ func TestAll(t *testing.T) {
 	filenames := []string{
 		"testdata/cannot.go",
 		"testdata/example.go",
+		"testdata/named.go",
 		"testdata/comment.go",
-		"testdata/removed-comment.go",
+		"testdata/first1.go",
+		"testdata/first2.go",
+		"testdata/removed-comments.go",
+		"testdata/plenty-imports.go",
+		"testdata/dotimport.go",
+		"testdata/space.go",
+		"testdata/samename.go",
+		"testdata/packagename.go",
 	}
 
 	for i, path := range filenames {
@@ -86,7 +94,6 @@ func TestAll(t *testing.T) {
 }
 
 func runOneFile(t *testing.T, fset *token.FileSet, path string) {
-	t.Helper()
 	src, err := ioutil.ReadFile(path)
 	if err != nil {
 		t.Fatalf("failed to read file: %s", err)

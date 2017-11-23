@@ -1,0 +1,9 @@
+package pkg
+
+import (
+	"math/bits"
+)
+
+func bar() {
+	_ = bits.Len16(0)
+}

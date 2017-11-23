@@ -55,12 +55,12 @@
 //      ...
 //   }
 //
-// Package names
+// Package name guessing
 //
-// For unnamed imports, the command guesses at the package name by looking
-// at the import path. The package name is, in most cases, the basename of
-// the import path. The command automatically handles patterns such as
-// these:
+// For unnamed imports, the command guesses at the import's package name by
+// looking at the import path. The package name is, in most cases, the
+// basename of the import path. The command automatically handles patterns
+// such as these:
 //
 //   Import path                            Package name    Notes
 //   -----------------                      ------------    ---------------
@@ -253,8 +253,6 @@ func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, e
 			return nil, err
 		}
 	}
-
-	ast.SortImports(fset, file)
 
 	return file, nil
 }
@@ -542,7 +540,11 @@ func guessPackageName_(p string, again bool) string {
 	case again && dotvn.MatchString(last):
 		// foo.org/blah/go-yaml.v2
 		// need to use (a cleaned up version of) "go-yaml"
-		return guessPackageName_(p[:sidx], false)
+		didx := strings.LastIndex(p, ".")
+		if didx == -1 {
+			panicf("[code bug] should have '.' in string: %s", p)
+		}
+		return guessPackageName_(p[:didx], false)
 	case strings.HasPrefix(last, "go-"):
 		// foo.org/go-yaml
 		return strings.TrimPrefix(last, "go-")
