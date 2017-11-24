@@ -1,6 +1,6 @@
 // Command dedupimport finds and removes duplicate imports that have the
-// same import path but have been imported using different import names. See
-// 'dedupimport -h' for usage.
+// same import path but different import names. See 'dedupimport -h' for
+// usage.
 //
 // When resolving duplicate imports, by default, it keeps the unnamed import
 // and removes the named imports. This behavior can be customized with the
@@ -910,13 +910,13 @@ func writeTempFile(dir, prefix string, data []byte) (string, error) {
 }
 
 func cmdDiff(b1, b2 []byte, filename string) (data []byte, err error) {
-	f1, err := writeTempFile("", "gofmt", b1)
+	f1, err := writeTempFile("", "dedupimport", b1)
 	if err != nil {
 		return
 	}
 	defer os.Remove(f1)
 
-	f2, err := writeTempFile("", "gofmt", b2)
+	f2, err := writeTempFile("", "dedupimport", b2)
 	if err != nil {
 		return
 	}
@@ -938,8 +938,8 @@ func cmdDiff(b1, b2 []byte, filename string) (data []byte, err error) {
 
 // replaceTempFilename replaces temporary filenames in diff with actual one.
 //
-// --- /tmp/gofmt316145376	2017-02-03 19:13:00.280468375 -0500
-// +++ /tmp/gofmt617882815	2017-02-03 19:13:00.280468375 -0500
+// --- /tmp/dedupimport316145376	2017-02-03 19:13:00.280468375 -0500
+// +++ /tmp/dedupimport617882815	2017-02-03 19:13:00.280468375 -0500
 // ...
 // ->
 // --- path/to/file.go.orig	2017-02-03 19:13:00.280468375 -0500
