@@ -330,12 +330,12 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 				panicf("[code bug] selector expr should be in a scope, but unaware of any such scope")
 			}
 			if isGoKeyword(to) {
-				// cannot happen. src must already have had a parser error.
+				// cannot happen. source code must already have had a parse or build error.
 				addError(&GoKeywordError{fset.Position(x.X.Pos()), from, to})
 				return true
 			}
 			if !isValidIdent(to) {
-				// cannot happen. src must already have had a parser error.
+				// cannot happen. source code must already have had a parse/build error.
 				addError(&InvalidIdentError{fset.Position(x.X.Pos()), from, to})
 				return true
 			}
