@@ -796,7 +796,7 @@ func writeOutput(out io.Writer, src, res []byte, filename string) error {
 func isGoFile(f os.FileInfo) bool {
 	// ignore non-Go files
 	name := f.Name()
-	return !f.IsDir() && !strings.HasPrefix(name, ".") && strings.HasSuffix(name, ".go")
+	return !f.IsDir() && !strings.HasPrefix(name, ".") && !strings.HasPrefix(name, "_") && strings.HasSuffix(name, ".go")
 }
 
 // ----------------------------------------------------------------------------
