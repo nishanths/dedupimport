@@ -228,14 +228,27 @@ func parserMode() parser.Mode {
 	return parser.ParseComments
 }
 
+type posSpan struct {
+	Start token.Pos
+	End   token.Pos
+}
+
 func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, error) {
 	file, err := parser.ParseFile(fset, filename, src, parserMode())
 	if err != nil {
 		return nil, err
 	}
 
-	// find duplicate imports.
+	// Record positions for specs.
+	// Need to do this before updating file.Imports.
+	pos := make([]posSpan, len(file.Imports))
+	for i, s := range file.Imports {
+		pos[i] = posSpan{s.Pos(), s.End()}
+	}
+
+	// Find duplicate imports.
 	imports := markDuplicates(file.Imports)
+
 	var keep, remove []*ast.ImportSpec
 	for _, im := range imports {
 		if im.remove {
@@ -249,13 +262,11 @@ func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, e
 		return nil, nil
 	}
 
+	// record comments.
 	cmap := ast.NewCommentMap(fset, file, file.Comments)
 
-	// update the file's imports.
-	file.Imports = keep
-
-	// update the file's AST.
-	trimImportDecls(file)
+	file.Imports = keep   // update the file's imports.
+	trimImportDecls(file) // update the file's AST.
 
 	// get rid of comments that no longer belong.
 	file.Comments = cmap.Filter(file).Comments()
@@ -276,10 +287,28 @@ func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, e
 			rules[from] = to
 		}
 
+		// rewrite
 		err := rewriteSelectorExprs(fset, rules, scope, file.Name.Name)
 		if err != nil {
 			return nil, err
 		}
+	}
+
+	for i, im := range imports {
+		if im.remove {
+			if i != len(imports)-1 {
+				p := im.spec.Pos()
+				fset.File(p).MergeLine(fset.Position(p).Line)
+			}
+		}
+	}
+	for i, im := range imports {
+		s := im.spec
+		if s.Name != nil {
+			s.Name.NamePos = pos[i].Start
+		}
+		s.Path.ValuePos = pos[i].Start
+		s.EndPos = pos[i].End
 	}
 
 	return file, nil
