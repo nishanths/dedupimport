@@ -375,7 +375,7 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 			}
 			// TOOD: similar to pkgName, can also check on not using the
 			// same identifier as another named import.
-			if latest.available(to) {
+			if id, ok := latest.available(to); ok && id.NamePos <= ident.NamePos { // exists && declared before
 				addError(&ScopeError{fset.Position(x.X.Pos()), from, to})
 				break
 			}

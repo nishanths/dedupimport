@@ -6,11 +6,12 @@ import (
 )
 
 type Scope struct {
-	node   ast.Node              // the underlying node that defines this scope (*ast.File, *ast.FuncDecl, *ast.BlockStmt, *ast.FuncLit)
-	outer  *Scope                // parent scope, or nil
-	inner  []*Scope              // immediate inner scopes
-	idents map[string]*ast.Ident // idents in this scope; the key is the name of the ident for fast lookup
-	done   bool                  // completed "parsing" this scope; exists to guard against programmer error
+	node           ast.Node              // the underlying node that defines this scope (*ast.File, *ast.FuncDecl, *ast.BlockStmt, *ast.FuncLit)
+	lbrace, rbrace token.Pos             // token.NoPos for *ast.File, *ast.FuncDecl, *ast.FuncLit; actual values for *ast.BlockStmt
+	outer          *Scope                // parent scope, or nil
+	inner          []*Scope              // immediate inner scopes
+	idents         map[string]*ast.Ident // idents in this scope; the key is the name of the ident for fast lookup
+	done           bool                  // completed "parsing" this scope; exists to guard against programmer error
 }
 
 func newScope(node ast.Node) *Scope {
@@ -39,24 +40,24 @@ func (sc *Scope) addIdent(ident *ast.Ident) {
 	sc.idents[ident.Name] = ident
 }
 
-// declared returns whether the named identifier
+// declared returns the named identifier if such a one
 // is declared in this scope.
-func (sc *Scope) declared(name string) bool {
+func (sc *Scope) declared(name string) (*ast.Ident, bool) {
 	sc.assertDone()
-	_, ok := sc.idents[name]
-	return ok
+	id, ok := sc.idents[name]
+	return id, ok
 }
 
-// available returns whether the named identifier is
-// delcared in this scope or any of the outer scopes.
-func (sc *Scope) available(name string) bool {
+// available returns the named identifier if such a one is
+// declared in this scope or any of the outer scopes.
+func (sc *Scope) available(name string) (*ast.Ident, bool) {
 	sc.assertDone()
 	for c := sc; c != nil; c = c.outer {
-		if c.declared(name) {
-			return true
+		if id, ok := c.declared(name); ok {
+			return id, true
 		}
 	}
-	return false
+	return nil, false
 }
 
 // each calls fn for each scope inside sc,
@@ -201,6 +202,8 @@ func walkFuncLit(x *ast.FuncLit) *Scope {
 
 func walkBlockStmt(x *ast.BlockStmt) *Scope {
 	cur := newScope(x)
+	cur.lbrace = x.Lbrace
+	cur.rbrace = x.Rbrace
 
 	ast.Inspect(x, func(node ast.Node) bool {
 		switch xx := node.(type) {
