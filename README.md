@@ -2,7 +2,8 @@
 
 [![Build Status](https://travis-ci.org/nishanths/dedupimport.svg?branch=master)](https://travis-ci.org/nishanths/dedupimport)
 
-Remove duplicate imports that have been imported using different names.
+Remove duplicate imports that have the same import path but have been imported
+using different import names.
 
 ```
 go get -u github.com/nishanths/dedupimport

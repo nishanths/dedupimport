@@ -1,5 +1,6 @@
-// Command dedupimport finds and removes duplicate imports, imported using
-// different names. See 'dedupimport -h' for usage.
+// Command dedupimport finds and removes duplicate imports that have the
+// same import path but have been imported using different import names. See
+// 'dedupimport -h' for usage.
 //
 // When resolving duplicate imports, by default, it keeps the unnamed import
 // and removes the named imports. This behavior can be customized with the
