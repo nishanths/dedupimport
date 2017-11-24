@@ -1,27 +1,27 @@
-## dupeimport
+## dedupimport
 
-[![Build Status](https://travis-ci.org/nishanths/dupeimport.svg?branch=master)](https://travis-ci.org/nishanths/dupeimport)
+[![Build Status](https://travis-ci.org/nishanths/dedupimport.svg?branch=master)](https://travis-ci.org/nishanths/dedupimport)
 
 Remove duplicate imports that have been imported using different names.
 
 ```
-go get -u github.com/nishanths/dupeimport
+go get -u github.com/nishanths/dedupimport
 
-usage: dupeimport [flags] [path ...]
-  dupeimport file1.go file2.go dir
-  dupeimport -w file1.go           # overwrite source file
-  dupeimport -keep named file1.go  # when resolving duplicate imports, keep the shortest named import
-  dupeimport -h                    # help
+usage: dedupimport [flags] [path ...]
+  dedupimport file1.go file2.go dir
+  dedupimport -w file1.go           # overwrite source file
+  dedupimport -keep named file1.go  # when resolving duplicate imports, keep the shortest named import
+  dedupimport -h                    # help
 ```
 
 ## Docs
 
-See [godoc](https://godoc.org/github.com/nishanths/dupeimport). 
+See [godoc](https://godoc.org/github.com/nishanths/dedupimport). 
 
 Or run:
 
 ```
-go doc github.com/nishanths/dupeimport
+go doc github.com/nishanths/dedupimport
 ```
 
 ## Example
@@ -40,10 +40,10 @@ var client frontend.Client
 var server fe.Server
 ```
 
-running dupeimport on it with default options
+running dedupimport on it with default options
 
 ```
-dupeimport file.go
+dedupimport file.go
 ```
 
 will produce

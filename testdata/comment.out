@@ -1,4 +1,4 @@
-//dupeimport -keep comment
+//dedupimport -keep comment
 
 package pkg
 

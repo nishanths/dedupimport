@@ -1,4 +1,4 @@
-//dupeimport -keep named
+//dedupimport -keep named
 
 package pkg
 

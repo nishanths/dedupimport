@@ -1,5 +1,5 @@
-// Command dupeimport finds and removes duplicate imports, imported using
-// different names. See 'dupeimport -h' for usage.
+// Command dedupimport finds and removes duplicate imports, imported using
+// different names. See 'dedupimport -h' for usage.
 //
 // When resolving duplicate imports, by default, it keeps the unnamed import
 // and removes the named imports. This behavior can be customized with the
@@ -17,10 +17,10 @@
 //
 // The typical usage is:
 //
-//   dupeimport file1.go dir1 dir2 # prints updated versions to stdout
-//   dupeimport -w file.go         # overwrite original source file
-//   dupeimport -d file.go         # display diff
-//   dupeimport -l file.go dir     # list the filenames that have duplicate imports
+//   dedupimport file1.go dir1 dir2 # prints updated versions to stdout
+//   dedupimport -w file.go         # overwrite original source file
+//   dedupimport -d file.go         # display diff
+//   dedupimport -l file.go dir     # list the filenames that have duplicate imports
 //
 // Example
 //
@@ -36,7 +36,7 @@
 // 	var client frontend.Client
 // 	var server fe.Server
 //
-// running dupeimport with default options will produce
+// running dedupimport with default options will produce
 //
 // 	package pkg
 //
@@ -101,7 +101,7 @@
 // The flag can be repeated multiple times to specify multiple mappings. For
 // example:
 //
-//   dupeimport -m github.com/proj/serverimpl=server \
+//   dedupimport -m github.com/proj/serverimpl=server \
 //     -m github.com/priarie/go-k8s-client=clientk8s
 package main
 
@@ -126,8 +126,8 @@ import (
 	"unicode"
 )
 
-const help = `usage: dupeimport [flags] [path ...]
-See 'go doc github.com/nishanths/dupeimport' for details.`
+const help = `usage: dedupimport [flags] [path ...]
+See 'go doc github.com/nishanths/dedupimport' for details.`
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "%s\n\n", help)
@@ -160,7 +160,7 @@ func (m MultiFlag) Set(val string) error {
 }
 
 var (
-	flagSet    = flag.NewFlagSet("dupeimport", flag.ExitOnError)
+	flagSet    = flag.NewFlagSet("dedupimport", flag.ExitOnError)
 	diff       = flagSet.Bool("d", false, "display diff instead of rewriting files")
 	allErrors  = flagSet.Bool("e", false, "report all parse errors, not just the first 10 on different lines")
 	list       = flagSet.Bool("l", false, "list files with duplicate imports")

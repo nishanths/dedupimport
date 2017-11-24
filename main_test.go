@@ -40,7 +40,7 @@ func parseFlags(p string) {
 		panic(fmt.Sprintf("no lines in file: %s", p))
 	}
 	// Does it have the prefix?
-	const prefix = "//dupeimport"
+	const prefix = "//dedupimport"
 	line := string(b[:idx])
 	if !strings.HasPrefix(line, prefix) {
 		return

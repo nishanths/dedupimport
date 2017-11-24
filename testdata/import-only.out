@@ -1,4 +1,4 @@
-//dupeimport -i
+//dedupimport -i
 
 package pkg
 

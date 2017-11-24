@@ -1,4 +1,4 @@
-//dupeimport -keep first
+//dedupimport -keep first
 
 package pkg
 
