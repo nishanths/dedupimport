@@ -101,10 +101,11 @@ import (
 	"unicode"
 )
 
-const help = `usage: dupeimport [flags] [path ...]`
+const help = `usage: dupeimport [flags] [path ...]
+See 'go doc github.com/nishanths/dupeimport' for details.`
 
 func usage() {
-	fmt.Fprintf(os.Stderr, "%s\n", help)
+	fmt.Fprintf(os.Stderr, "%s\n\n", help)
 	flagSet.PrintDefaults()
 	os.Exit(2)
 }
