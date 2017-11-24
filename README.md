@@ -1,5 +1,7 @@
 ## dupeimport
 
+[![Build Status](https://travis-ci.org/nishanths/dupeimport.svg?branch=master)](https://travis-ci.org/nishanths/dupeimport)
+
 Remove duplicate imports that have been imported using different names.
 
 ```
