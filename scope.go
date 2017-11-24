@@ -104,21 +104,17 @@ func walkFile(file *ast.File) *Scope {
 			for _, name := range x.Names {
 				cur.addIdent(name)
 			}
-			return false
 		case *ast.TypeSpec:
 			cur.addIdent(x.Name)
-			return false
 		case *ast.FuncDecl:
 			cur.addIdent(x.Name)
 			inner := walkFuncDecl(x)
 			cur.inner = append(cur.inner, inner)
 			inner.outer = cur
-			return false
 		case *ast.FuncLit:
 			inner := walkFuncLit(x)
 			cur.inner = append(cur.inner, inner)
 			inner.outer = cur
-			return false
 		}
 		return true
 	})
@@ -202,17 +198,14 @@ func walkBlockStmt(x *ast.BlockStmt) *Scope {
 			for _, name := range xx.Names {
 				cur.addIdent(name)
 			}
-			return false
 		case *ast.FuncLit:
 			// unlike a FuncDecl, a FuncLit has no name,
 			// so there's no ident to add to cur.
 			inner := walkFuncLit(xx)
 			cur.inner = append(cur.inner, inner)
 			inner.outer = cur
-			return false
 		case *ast.TypeSpec:
 			cur.addIdent(xx.Name)
-			return false
 		case *ast.AssignStmt:
 			// The Lhs contains the identifier.  We only care about short
 			// variable declarations, which use token.DEFINE.
@@ -223,7 +216,6 @@ func walkBlockStmt(x *ast.BlockStmt) *Scope {
 					}
 				}
 			}
-			return false
 		case *ast.BlockStmt:
 			if x == xx {
 				// Skip original argument to Inspect.
@@ -234,7 +226,6 @@ func walkBlockStmt(x *ast.BlockStmt) *Scope {
 			inner := walkBlockStmt(xx)
 			cur.inner = append(cur.inner, inner)
 			inner.outer = cur
-			return false
 		}
 		return true
 	})

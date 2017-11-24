@@ -57,7 +57,7 @@
 //
 // Package name guessing
 //
-// For unnamed imports, the command guesses at the import's package name by
+// For unnamed imports, the command has to guess the import's package name by
 // looking at the import path. The package name is, in most cases, the
 // basename of the import path. The command automatically handles patterns
 // such as these:
@@ -287,23 +287,22 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 			ident, ok := x.X.(*ast.Ident)
 			if !ok {
 				// don't care
-				return false
+				return true
 			}
 			to, ok := rules[ident.Name]
 			if !ok {
 				// this selector expr is not one we want to rewrite
-				return false
+				return true
 			}
 			if latest == nil {
 				panicf("[code bug] selector expr should be in a scope, but unaware of any such scope")
 			}
 			if latest.available(to) {
-				addError(fmt.Errorf("%s: cannot rewrite %s -> %s: identifier %[3]s in scope does not refer to the imported package",
+				addError(fmt.Errorf("%s: cannot rewrite %s -> %s: identifier %[3]s in scope might not be referring to the import",
 					fset.Position(x.X.Pos()), ident.Name, to))
-				return false
+				return true
 			}
 			ident.Name = to // rewrite
-			return false
 		}
 		return true
 	})
