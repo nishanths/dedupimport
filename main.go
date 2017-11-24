@@ -101,7 +101,7 @@ import (
 	"unicode"
 )
 
-const help = `usage: dupeimports [flags] [path ...]`
+const help = `usage: dupeimport [flags] [path ...]`
 
 func usage() {
 	fmt.Fprintf(os.Stderr, "%s\n", help)
