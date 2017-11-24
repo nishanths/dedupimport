@@ -22,6 +22,31 @@
 //   dupeimport -d file.go         # display diff
 //   dupeimport -l file.go dir     # list the filenames that have duplicate imports
 //
+// Example
+//
+// Given the file
+//
+// 	package pkg
+//
+// 	import (
+// 		"code.org/frontend"
+// 		fe "code.org/frontend"
+// 	)
+//
+// 	var client frontend.Client
+// 	var server fe.Server
+//
+// running dupeimport with default options will produce
+//
+// 	package pkg
+//
+// 	import (
+// 		"code.org/frontend"
+// 	)
+//
+// 	var client frontend.Client
+// 	var server frontend.Server
+//
 // Strategy to use when resolving duplicates
 //
 // The '-keep' flag allows you to choose which import to keep and which ones to

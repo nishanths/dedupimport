@@ -37,8 +37,7 @@ import (
 )
 
 var client frontend.Client
-
-func send(req fe.Request) {}
+var server fe.Server
 ```
 
 running dupeimport on it with default options
@@ -57,6 +56,5 @@ import (
 )
 
 var client frontend.Client
-
-func send(req frontend.Request) {}
+var server frontend.Server
 ```
