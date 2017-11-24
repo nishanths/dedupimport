@@ -257,6 +257,34 @@ func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, e
 	return file, nil
 }
 
+type scopeStack struct {
+	list []*Scope
+}
+
+func (s *scopeStack) push(sc *Scope) {
+	s.list = append(s.list, sc)
+}
+
+func (s *scopeStack) pop() *Scope {
+	if len(s.list) == 0 {
+		panic("pop of zero-length stack")
+	}
+	res := s.list[len(s.list)-1]
+	s.list = s.list[:len(s.list)-1]
+	return res
+}
+
+// latest returns the latest non-nil entry in the stack
+// or nil if there is no such entry.
+func (s *scopeStack) latest() *Scope {
+	for i := len(s.list) - 1; i >= 0; i-- {
+		if s.list[i] != nil {
+			return s.list[i]
+		}
+	}
+	return nil
+}
+
 // rewriteSelectorExprs rewrites selector exprs in the supplied scope based
 // on the rewrite rules. If a rewrite could not be performed, it will be
 // described in the returned error. The returned error will be of type
@@ -264,7 +292,7 @@ func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, e
 func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Scope) error {
 	// first, map nodes to their scopes.
 	scopeByNode := make(map[ast.Node]*Scope)
-	root.traverse(func(s *Scope) bool {
+	root.each(func(s *Scope) bool {
 		scopeByNode[s.node] = s
 		return true
 	})
@@ -274,12 +302,13 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 		errs = append(errs, e)
 	}
 
-	var latest *Scope // track the latest scope; the selector expr will be inside it
+	var stack scopeStack
 	ast.Inspect(root.node, func(node ast.Node) bool {
-		s, ok := scopeByNode[node]
-		if ok {
-			latest = s
+		sc := scopeByNode[node]
+		if node != nil {
+			stack.push(sc)
 		}
+
 		switch x := node.(type) {
 		case *ast.SelectorExpr:
 			// we only care about package selector exprs,
@@ -294,6 +323,7 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 				// this selector expr is not one we want to rewrite
 				return true
 			}
+			latest := stack.latest()
 			if latest == nil {
 				panicf("[code bug] selector expr should be in a scope, but unaware of any such scope")
 			}
@@ -304,6 +334,11 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 			}
 			ident.Name = to // rewrite
 		}
+
+		if node == nil {
+			stack.pop()
+		}
+
 		return true
 	})
 

@@ -81,6 +81,8 @@ func TestAll(t *testing.T) {
 		"testdata/space.go",
 		"testdata/samename.go",
 		"testdata/packagename.go",
+		"testdata/scope1.go",
+		"testdata/scope3.go",
 	}
 
 	for i, path := range filenames {

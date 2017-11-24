@@ -59,8 +59,10 @@ func (sc *Scope) available(name string) bool {
 	return false
 }
 
-// traverse walks the scope in breadth first order.
-func (sc *Scope) traverse(fn func(*Scope) bool) {
+// each calls fn for each scope inside sc,
+// including sc itself.
+func (sc *Scope) each(fn func(*Scope) bool) {
+	// breadth first traversal.
 	q := []*Scope{sc}
 	for len(q) != 0 {
 		var c *Scope
@@ -104,17 +106,25 @@ func walkFile(file *ast.File) *Scope {
 			for _, name := range x.Names {
 				cur.addIdent(name)
 			}
+			return true // For instance, FuncLit can be inside
 		case *ast.TypeSpec:
 			cur.addIdent(x.Name)
+			// no more exploration to do since no scope can exist inside; TypeSpecs
+			// have FieldLists inside them, not BlockStmts
+			return false
 		case *ast.FuncDecl:
 			cur.addIdent(x.Name)
 			inner := walkFuncDecl(x)
 			cur.inner = append(cur.inner, inner)
 			inner.outer = cur
+			return false // walkFuncDecl would have explored the inner scopes
 		case *ast.FuncLit:
+			// unlike a FuncDecl, a FuncLit has no name,
+			// so there's no ident to add to cur.
 			inner := walkFuncLit(x)
 			cur.inner = append(cur.inner, inner)
 			inner.outer = cur
+			return false // walkFuncLit would have explored the inner scopes
 		}
 		return true
 	})
@@ -198,14 +208,15 @@ func walkBlockStmt(x *ast.BlockStmt) *Scope {
 			for _, name := range xx.Names {
 				cur.addIdent(name)
 			}
+			return true
 		case *ast.FuncLit:
-			// unlike a FuncDecl, a FuncLit has no name,
-			// so there's no ident to add to cur.
 			inner := walkFuncLit(xx)
 			cur.inner = append(cur.inner, inner)
 			inner.outer = cur
+			return false
 		case *ast.TypeSpec:
 			cur.addIdent(xx.Name)
+			return false
 		case *ast.AssignStmt:
 			// The Lhs contains the identifier.  We only care about short
 			// variable declarations, which use token.DEFINE.
@@ -216,6 +227,7 @@ func walkBlockStmt(x *ast.BlockStmt) *Scope {
 					}
 				}
 			}
+			return true // because the Rhs can be a FuncLit, for instance
 		case *ast.BlockStmt:
 			if x == xx {
 				// Skip original argument to Inspect.
@@ -226,6 +238,7 @@ func walkBlockStmt(x *ast.BlockStmt) *Scope {
 			inner := walkBlockStmt(xx)
 			cur.inner = append(cur.inner, inner)
 			inner.outer = cur
+			return false // walkBlockStmt above would have explored the inner scopes
 		}
 		return true
 	})
