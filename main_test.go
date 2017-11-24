@@ -82,6 +82,8 @@ func TestAll(t *testing.T) {
 		"testdata/plenty-imports.go",
 		"testdata/dotimport.go",
 		"testdata/space.go",
+		"testdata/space-all1.go",
+		"testdata/space-all2.go",
 		"testdata/samename.go",
 		"testdata/packagename.go",
 		"testdata/scope1.go",

@@ -262,21 +262,21 @@ func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, e
 		return nil, nil
 	}
 
-	// record comments.
+	// Record comments.
 	cmap := ast.NewCommentMap(fset, file, file.Comments)
 
 	file.Imports = keep   // update the file's imports.
 	trimImportDecls(file) // update the file's AST.
 
-	// get rid of comments that no longer belong.
+	// Get rid of comments that no longer belong.
 	file.Comments = cmap.Filter(file).Comments()
 
 	if !*importOnly {
-		// get the identifiers in scopes.
-		// we need it to check if rewriting selector exprs is safe.
+		// Get the identifiers in scopes.
+		// We need it to check if rewriting selector exprs is safe.
 		scope := walkFile(file)
 
-		// build up the selector expr rewrite rules.
+		// Build up the selector expr rewrite rules.
 		rules := make(map[string]string)
 		for _, im := range imports {
 			if !im.remove {
@@ -287,21 +287,30 @@ func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, e
 			rules[from] = to
 		}
 
-		// rewrite
+		// Rewrite.
 		err := rewriteSelectorExprs(fset, rules, scope, file.Name.Name)
 		if err != nil {
 			return nil, err
 		}
 	}
 
-	for i, im := range imports {
+	// If an import is removed, merge the next line into it.
+	for _, im := range imports {
 		if im.remove {
-			if i != len(imports)-1 {
-				p := im.spec.Pos()
-				fset.File(p).MergeLine(fset.Position(p).Line)
+			pos := im.spec.Pos()
+			line := fset.Position(pos).Line
+			fp := fset.File(pos)
+			if line >= fp.LineCount() {
+				// don't do merging at end of file
+				continue
 			}
+			fp.MergeLine(line)
 		}
 	}
+	// Update the positions we recorded earlier.
+	// Don't have to worry about fixing up comments here
+	// because comments for removed imports would have already been removed
+	// by the commentMap work earlier.
 	for i, im := range imports {
 		s := im.spec
 		if s.Name != nil {
