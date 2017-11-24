@@ -98,6 +98,7 @@ import (
 	"runtime"
 	"strconv"
 	"strings"
+	"unicode"
 )
 
 const help = `usage: dupeimports [flags] [path ...]`
@@ -288,7 +289,7 @@ func (s *scopeStack) latest() *Scope {
 // rewriteSelectorExprs rewrites selector exprs in the supplied scope based
 // on the rewrite rules. If a rewrite could not be performed, it will be
 // described in the returned error. The returned error will be of type
-// RewriteError (even if there was only a single error).
+// MultiError (even if there was only a single error).
 func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Scope) error {
 	// first, map nodes to their scopes.
 	scopeByNode := make(map[ast.Node]*Scope)
@@ -297,7 +298,7 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 		return true
 	})
 
-	var errs RewriteError
+	var errs MultiError
 	addError := func(e error) {
 		errs = append(errs, e)
 	}
@@ -318,7 +319,8 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 				// don't care
 				return true
 			}
-			to, ok := rules[ident.Name]
+			from := ident.Name
+			to, ok := rules[from]
 			if !ok {
 				// this selector expr is not one we want to rewrite
 				return true
@@ -327,9 +329,18 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 			if latest == nil {
 				panicf("[code bug] selector expr should be in a scope, but unaware of any such scope")
 			}
+			if isGoKeyword(to) {
+				// cannot happen. src must already have had a parser error.
+				addError(&GoKeywordError{fset.Position(x.X.Pos()), from, to})
+				return true
+			}
+			if !isValidIdent(to) {
+				// cannot happen. src must already have had a parser error.
+				addError(&InvalidIdentError{fset.Position(x.X.Pos()), from, to})
+				return true
+			}
 			if latest.available(to) {
-				addError(fmt.Errorf("%s: cannot rewrite %s -> %s: identifier %[3]s in scope might not be referring to the import",
-					fset.Position(x.X.Pos()), ident.Name, to))
+				addError(&ScopeError{fset.Position(x.X.Pos()), from, to})
 				return true
 			}
 			ident.Name = to // rewrite
@@ -348,13 +359,88 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 	return errs
 }
 
-type RewriteError []error
+func isValidIdent(w string) bool {
+	// https://golang.org/ref/spec#identifier
+	if len(w) == 0 {
+		return false
+	}
+	isLetter := func(r rune) bool {
+		return unicode.In(r, unicode.Lu, unicode.Ll, unicode.Lt, unicode.Lm, unicode.Lo)
+	}
+	isNumber := func(r rune) bool {
+		return unicode.In(r, unicode.Nd)
+	}
+	for i, r := range w {
+		switch i {
+		case 0:
+			if !(isLetter(r) || r == '_') {
+				return false
+			}
+		default:
+			if !(isLetter(r) || r == '_' || isNumber(r)) {
+				return false
+			}
+		}
+	}
+	return true
+}
 
-var _ error = (RewriteError)(nil)
+func isGoKeyword(w string) bool {
+	switch w {
+	case "break", "default", "func", "interface", "select",
+		"case", "defer", "go", "map", "struct",
+		"chan", "else", "goto", "package", "switch",
+		"const", "fallthrough", "if", "range", "type",
+		"continue", "for", "import", "return", "var":
+		return true
+	default:
+		return false
+	}
+}
 
-func (m RewriteError) Error() string {
+type InvalidIdentError struct {
+	position token.Position
+	from, to string
+}
+
+var _ error = (*InvalidIdentError)(nil)
+
+func (s *InvalidIdentError) Error() string {
+	return fmt.Sprintf("%s: cannot rewrite %s -> %s: identifier %[3]s is not a valid identifier; specify a mapping for the import using '-m'",
+		s.position, s.from, s.to)
+}
+
+type GoKeywordError struct {
+	position token.Position
+	from, to string
+}
+
+var _ error = (*GoKeywordError)(nil)
+
+func (s *GoKeywordError) Error() string {
+	return fmt.Sprintf("%s: cannot rewrite %s -> %s: identifier %[3]s is a go keyword; specify a mapping for the import using '-m'",
+		s.position, s.from, s.to)
+}
+
+type ScopeError struct {
+	position token.Position
+	from, to string
+}
+
+var _ error = (*ScopeError)(nil)
+
+func (s *ScopeError) Error() string {
+	return fmt.Sprintf("%s: cannot rewrite %s -> %s: identifier %[3]s in scope might not be referring to the import",
+		s.position, s.from, s.to)
+}
+
+type MultiError []error
+
+var _ error = (MultiError)(nil)
+
+func (m MultiError) Error() string {
 	if len(m) == 0 {
-		panic("[code bug] RewriteError has zero errors") // don't make such a RewriteError in the first place.
+		panic("[code bug] MultiError has zero errors") // don't make such a MultiError in the first place.
 	}
 	var buf bytes.Buffer
 	for i, e := range m {
