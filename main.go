@@ -275,7 +275,7 @@ func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, e
 			rules[from] = to
 		}
 
-		err := rewriteSelectorExprs(fset, rules, scope)
+		err := rewriteSelectorExprs(fset, rules, scope, file.Name.Name)
 		if err != nil {
 			return nil, err
 		}
@@ -316,7 +316,7 @@ func (s *scopeStack) latest() *Scope {
 // on the rewrite rules. If a rewrite could not be performed, it will be
 // described in the returned error. The returned error will be of type
 // MultiError (even if there was only a single error).
-func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Scope) error {
+func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Scope, pkgName string) error {
 	// first, map nodes to their scopes.
 	scopeByNode := make(map[ast.Node]*Scope)
 	root.each(func(s *Scope) bool {
@@ -333,6 +333,10 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 	ast.Inspect(root.node, func(node ast.Node) bool {
 		sc := scopeByNode[node]
 		if node != nil {
+			// enter a deeper level.  sc may be nil (because the node
+			// wasn't a scope creating node).
+			// the latest non-nil sc is the scope we want to track,
+			// and this is the scope that is returned by calling `latest`.
 			stack.push(sc)
 		}
 
@@ -343,36 +347,44 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 			ident, ok := x.X.(*ast.Ident)
 			if !ok {
 				// don't care
-				return true
+				break
 			}
 			from := ident.Name
 			to, ok := rules[from]
 			if !ok {
 				// this selector expr is not one we want to rewrite
-				return true
+				break
 			}
 			latest := stack.latest()
 			if latest == nil {
 				panicf("[code bug] selector expr should be in a scope, but unaware of any such scope")
 			}
 			if isGoKeyword(to) {
-				// cannot happen. source code must already have had a parse or build error.
+				// source code must already have a parse or build error.
 				addError(&GoKeywordError{fset.Position(x.X.Pos()), from, to})
-				return true
+				break
 			}
 			if !isValidIdent(to) {
-				// cannot happen. source code must already have had a parse/build error.
+				// source code must already have a parse/build error.
 				addError(&InvalidIdentError{fset.Position(x.X.Pos()), from, to})
-				return true
+				break
 			}
+			if to == pkgName {
+				addError(&GuessError{fset.Position(x.X.Pos()), "package", from, to})
+				break
+			}
+			// TOOD: similar to pkgName, can also check on not using the
+			// same identifier as another named import.
 			if latest.available(to) {
 				addError(&ScopeError{fset.Position(x.X.Pos()), from, to})
-				return true
+				break
 			}
 			ident.Name = to // rewrite
 		}
 
 		if node == nil {
+			// depth-first unraveling call by ast.Inspect.  pop an entry.
+			// the entry popped may be nil (see comment at `push`).
 			stack.pop()
 		}
 
@@ -424,6 +436,19 @@ func isGoKeyword(w string) bool {
 	}
 }
 
+type GuessError struct {
+	position token.Position
+	by       string
+	from, to string
+}
+
+var _ error = (*GuessError)(nil)
+
+func (s *GuessError) Error() string {
+	return fmt.Sprintf("%s: cannot rewrite %s -> %s: identifier %[3]s is the same as the %s identifier; "+
+		"specify a mapping for the import using '-m'", s.position, s.from, s.to, s.by)
+}
+
 type InvalidIdentError struct {
 	position token.Position
 	from, to string
@@ -432,8 +457,8 @@ type InvalidIdentError struct {
 var _ error = (*InvalidIdentError)(nil)
 
 func (s *InvalidIdentError) Error() string {
-	return fmt.Sprintf("%s: cannot rewrite %s -> %s: identifier %[3]s is not a valid identifier; specify a mapping for the import using '-m'",
-		s.position, s.from, s.to)
+	return fmt.Sprintf("%s: cannot rewrite %s -> %s: identifier %[3]s is not a valid identifier; "+
+		"specify a mapping for the import using '-m'", s.position, s.from, s.to)
 }
 
 type GoKeywordError struct {
@@ -444,8 +469,8 @@ type GoKeywordError struct {
 var _ error = (*GoKeywordError)(nil)
 
 func (s *GoKeywordError) Error() string {
-	return fmt.Sprintf("%s: cannot rewrite %s -> %s: identifier %[3]s is a go keyword; specify a mapping for the import using '-m'",
-		s.position, s.from, s.to)
+	return fmt.Sprintf("%s: cannot rewrite %s -> %s: identifier %[3]s is a go keyword; "+
+		"specify a mapping for the import using '-m'", s.position, s.from, s.to)
 }
 
 type ScopeError struct {

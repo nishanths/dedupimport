@@ -1,0 +1,1 @@
+testdata/defaultguess-package.go:12:2: cannot rewrite f -> fmt: identifier fmt is the same as the package identifier; specify a mapping for the import using '-m'
