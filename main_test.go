@@ -55,6 +55,8 @@ func parseFlags(p string) {
 		case "-keep":
 			i++
 			*strategy = args[i]
+		case "-i":
+			*importOnly = true
 		default:
 			panic("unhandled flag")
 		}
@@ -64,6 +66,7 @@ func parseFlags(p string) {
 
 func resetFlags() {
 	*strategy = "unnamed"
+	*importOnly = false
 }
 
 func TestAll(t *testing.T) {
@@ -85,6 +88,7 @@ func TestAll(t *testing.T) {
 		"testdata/scope2.go",
 		"testdata/misc.go",
 		"testdata/invalid-ident.go",
+		"testdata/import-only.go",
 	}
 
 	for i, path := range filenames {
