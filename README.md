@@ -9,10 +9,11 @@ names.
 go get -u github.com/nishanths/dedupimport
 
 usage: dedupimport [flags] [path ...]
-  dedupimport file1.go file2.go dir
-  dedupimport -w file1.go           # overwrite source file
-  dedupimport -keep named file1.go  # when resolving duplicate imports, keep the shortest named import
-  dedupimport -h                    # help
+
+dedupimport file1.go file2.go dir # print to stdout
+dedupimport -w file1.go           # overwrite source file
+dedupimport -keep named file1.go  # when resolving duplicate imports, keep the shortest named import
+dedupimport -h                    # help
 ```
 
 ## Docs

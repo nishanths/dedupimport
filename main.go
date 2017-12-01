@@ -408,10 +408,6 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 				addError(&InvalidIdentError{fset.Position(x.X.Pos()), from, to})
 				break
 			}
-			if to == pkgName {
-				addError(&GuessError{fset.Position(x.X.Pos()), "package", from, to})
-				break
-			}
 			// TOOD: similar to pkgName, can also check on not using the
 			// same identifier as another named import.
 			if id, ok := latest.available(to); ok && id.NamePos <= ident.NamePos { // exists && declared before
@@ -473,19 +469,6 @@ func isGoKeyword(w string) bool {
 	default:
 		return false
 	}
-}
-
-type GuessError struct {
-	position token.Position
-	by       string
-	from, to string
-}
-
-var _ error = (*GuessError)(nil)
-
-func (s *GuessError) Error() string {
-	return fmt.Sprintf("%s: cannot rewrite %s -> %s: identifier %[3]s is the same as the %s identifier; "+
-		"specify a mapping for the import using '-m'", s.position, s.from, s.to, s.by)
 }
 
 type InvalidIdentError struct {

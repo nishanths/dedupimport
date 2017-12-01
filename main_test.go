@@ -94,7 +94,6 @@ func TestAll(t *testing.T) {
 		"testdata/scopeafter1.go",
 		"testdata/scopeafter2.go",
 		"testdata/shortvar.go",
-		"testdata/defaultguess-package.go",
 	}
 
 	for i, path := range filenames {
