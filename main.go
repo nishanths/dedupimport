@@ -368,6 +368,11 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 		errs = append(errs, e)
 	}
 
+	// NOTE: this doesn't protect against package scope variables fully.
+	// For instance, 'var fe int' could be in a different file and visible
+	// across the package, but we would not warn about a "frontend" -> "fe"
+	// selector rewrite. This is okay for the most part, because
+	// the code would have had a compile error before anyway.
 	var stack scopeStack
 	ast.Inspect(root.node, func(node ast.Node) bool {
 		sc := scopeByNode[node]
