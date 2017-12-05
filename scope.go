@@ -114,7 +114,10 @@ func walkFile(file *ast.File) *Scope {
 			// have FieldLists inside them, not BlockStmts
 			return false
 		case *ast.FuncDecl:
-			cur.addIdent(x.Name)
+			if x.Recv == nil {
+				// only if it isn't a method
+				cur.addIdent(x.Name)
+			}
 			inner := walkFuncDecl(x)
 			cur.inner = append(cur.inner, inner)
 			inner.outer = cur
