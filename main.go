@@ -92,7 +92,6 @@
 //   -----------------                      ------------    ---------------
 //   github.com/foo/bar                     bar             Standard naming
 //   gopkg.in/yaml.v2                       yaml            Remove version
-//   k8s.io/apimachinery/pkg/apis/meta/v1   meta            Remove version
 //   github.com/nishanths/go-xkcd           xkcd            Remove 'go-' prefix
 //   github.com/nishanths/lyft-go           lyft            Remove '-go' suffix
 //
@@ -709,13 +708,12 @@ func packageNameForPath(p string) string {
 // package name).
 func guessPackageName(p string) string {
 	// at its most complicated, this can do:
-	// "foo.org/blah/go-yaml.v2/v2" -> "yaml"
+	// "foo.org/blah/go-yaml.v2" -> "yaml"
 	return guessPackageName_(p, true)
 }
 
 var (
 	dotvn = regexp.MustCompile(`\.v\d+$`)
-	vn    = regexp.MustCompile(`^v\d+$`)
 )
 
 func guessPackageName_(p string, again bool) string {
@@ -726,13 +724,9 @@ func guessPackageName_(p string, again bool) string {
 
 	last := p[sidx+1:]
 
-	// Order matters. For instance, the .vn check should happen before the
+	// Order matters. For instance, the .dotvn check should happen before the
 	// "go-" prefix check.
 	switch {
-	case again && vn.MatchString(last):
-		// foo.org/blah/go-pkg/v1
-		// need to use (a cleaned up version of) "go-pkg"
-		return guessPackageName_(p[:sidx], false)
 	case again && dotvn.MatchString(last):
 		// foo.org/blah/go-yaml.v2
 		// need to use (a cleaned up version of) "go-yaml"

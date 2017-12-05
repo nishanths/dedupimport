@@ -1,7 +1,7 @@
 package pkg
 
-import "foo.org/9io/v1"
-import n "foo.org/9io/v1"
+import "foo.org/9io"
+import n "foo.org/9io"
 
 import "go"
 import g "go"

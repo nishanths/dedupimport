@@ -12,7 +12,7 @@ func foo() {
 	_ = shellutil.x
 	_ = git.x
 	{
-		_ = meta.x
+		_ = v1.x
 	}
 	_ = hgconfig.x
 	{
