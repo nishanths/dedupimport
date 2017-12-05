@@ -408,8 +408,6 @@ func rewriteSelectorExprs(fset *token.FileSet, rules map[string]string, root *Sc
 				addError(&InvalidIdentError{fset.Position(x.X.Pos()), from, to})
 				break
 			}
-			// TOOD: similar to pkgName, can also check on not using the
-			// same identifier as another named import.
 			if id, ok := latest.available(to); ok && id.NamePos <= ident.NamePos { // exists && declared before
 				addError(&ScopeError{fset.Position(x.X.Pos()), from, to})
 				break
