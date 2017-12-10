@@ -234,6 +234,9 @@ func walkBlockStmt(x *ast.BlockStmt) *Scope {
 				}
 			}
 			return true // because the Rhs can be a FuncLit, for instance
+		case *ast.LabeledStmt:
+			cur.addIdent(xx.Label)
+			return true
 		case *ast.BlockStmt:
 			if x == xx {
 				// Skip original argument to Inspect.
