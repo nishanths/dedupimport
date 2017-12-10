@@ -110,6 +110,7 @@ import (
 	"flag"
 	"fmt"
 	"go/ast"
+	"go/build"
 	"go/format"
 	"go/parser"
 	"go/scanner"
@@ -271,6 +272,8 @@ func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, e
 	file.Comments = cmap.Filter(file).Comments()
 
 	if !*importOnly {
+		srcDir := filepath.Dir(filename)
+
 		// Get the identifiers in scopes.
 		// We need it to check if rewriting selector exprs is safe.
 		scope := walkFile(file)
@@ -281,8 +284,8 @@ func processFile(fset *token.FileSet, src []byte, filename string) (*ast.File, e
 			if !im.remove {
 				continue
 			}
-			from := packageNameForImport(im.spec)
-			to := packageNameForImport(im.subsumedBy)
+			from := packageNameForImport(im.spec, srcDir)
+			to := packageNameForImport(im.subsumedBy, srcDir)
 			rules[from] = to
 		}
 
@@ -683,7 +686,7 @@ func normalizeImportPath(p string) (string, error) {
 	return strconv.Unquote(p)
 }
 
-func packageNameForImport(spec *ast.ImportSpec) string {
+func packageNameForImport(spec *ast.ImportSpec, srcDir string) string {
 	if spec.Name != nil {
 		// named import
 		return spec.Name.Name
@@ -693,13 +696,21 @@ func packageNameForImport(spec *ast.ImportSpec) string {
 		// wasn't a valid string?
 		panicf("unquoting path: %s", err)
 	}
-	return packageNameForPath(path)
+	return packageNameForPath(path, srcDir)
 }
 
-func packageNameForPath(p string) string {
+func packageNameForPath(p string, srcDir string) string {
+	// Use the mapping first.
 	if name, ok := pkgNames.m[p]; ok {
 		return name
 	}
+	// Try build.Import. Ignore the error; pkg could be non-nil
+	// with sufficient information we care about regardless of the error.
+	pkg, _ := build.Import(p, srcDir, build.AllowBinary|build.ImportComment)
+	if pkg != nil && pkg.Name != "" {
+		return pkg.Name
+	}
+	// Guess it.
 	return guessPackageName(p)
 }
 
