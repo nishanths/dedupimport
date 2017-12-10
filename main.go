@@ -205,7 +205,7 @@ func main() {
 			path := flagSet.Arg(i)
 			info, err := os.Stat(path)
 			if err != nil {
-				fmt.Fprint(os.Stderr, err)
+				fmt.Fprintln(os.Stderr, err)
 				setExitCode(1)
 			} else if info.IsDir() {
 				handleDir(fset, path)
@@ -766,7 +766,7 @@ func handleFile(fset *token.FileSet, stdin bool, filename string, out io.Writer)
 		src, err = ioutil.ReadFile(filename)
 	}
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err)
 		setExitCode(1)
 		return
 	}
@@ -783,7 +783,7 @@ func handleFile(fset *token.FileSet, stdin bool, filename string, out io.Writer)
 		var buf bytes.Buffer
 		err := format.Node(&buf, fset, changedFile)
 		if err != nil {
-			fmt.Fprint(os.Stderr, err)
+			fmt.Fprintln(os.Stderr, err)
 			setExitCode(1)
 			return
 		}
@@ -791,7 +791,7 @@ func handleFile(fset *token.FileSet, stdin bool, filename string, out io.Writer)
 	}
 	err = writeOutput(out, src, res, filename)
 	if err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err)
 		setExitCode(1)
 		return
 	}
@@ -808,7 +808,7 @@ func handleDir(fset *token.FileSet, p string) {
 		handleFile(fset, false, path, os.Stdout)
 		return nil
 	}); err != nil {
-		fmt.Fprint(os.Stderr, err)
+		fmt.Fprintln(os.Stderr, err)
 		setExitCode(1)
 	}
 }
