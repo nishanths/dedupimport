@@ -1,30 +1,14 @@
 ## dedupimport
 
-[![Build Status](https://travis-ci.org/nishanths/dedupimport.svg?branch=master)](https://travis-ci.org/nishanths/dedupimport)
+[![Build Status](https://travis-ci.org/nishanths/dedupimport.svg?branch=master)](https://travis-ci.org/nishanths/dedupimport) [![Godoc](https://godoc.org/github.com/nishanths/dedupimport?status.svg)](http://godoc.org/github.com/nishanths/dedupimport)
 
 Remove duplicate imports that have the same import path but different import
 names.
 
 ```
 go get -u github.com/nishanths/dedupimport
-
-usage: dedupimport [flags] [path ...]
-
-dedupimport file1.go file2.go dir # print to stdout
-dedupimport -w file1.go           # overwrite source file
-dedupimport -keep named file1.go  # when resolving duplicate imports, keep the shortest named import
-dedupimport -h                    # help
 ```
-
-## Docs
-
-See [godoc](https://godoc.org/github.com/nishanths/dedupimport). 
-
-Or run:
-
-```
-go doc github.com/nishanths/dedupimport
-```
+See [godoc](https://godoc.org/github.com/nishanths/dedupimport) for flags and usage.
 
 ## Example
 
