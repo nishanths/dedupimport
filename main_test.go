@@ -96,13 +96,12 @@ func TestAll(t *testing.T) {
 		"testdata/shortvar.go",
 	}
 
-	for i, path := range filenames {
-		if testing.Verbose() {
-			t.Logf("testing file [%d]: %s", i, path)
-		}
-		resetFlags()
-		parseFlags(path)
-		runOneFile(t, fset, path)
+	for _, path := range filenames {
+		t.Run(path, func(t *testing.T) {
+			resetFlags()
+			parseFlags(path)
+			runOneFile(t, fset, path)
+		})
 	}
 }
 
@@ -140,5 +139,31 @@ func runOneFile(t *testing.T, fset *token.FileSet, path string) {
 			t.Errorf("unexpected error formatting file: %s", err)
 		}
 		equalBytes(t, outContent, outBuf.Bytes(), bytes.TrimSpace)
+	}
+}
+
+func TestGuessPackageName(t *testing.T) {
+	type testcase struct {
+		importPath string
+		expect     string
+	}
+	testcases := []testcase{
+		{"github.com/foo/bar", "bar"},
+		{"github.com/foo/bar/v2", "bar"},
+		{"github.com/foo/go-bar/v2", "bar"},
+		{"github.com/foo/bar-go/v2", "bar"},
+		{"gopkg.in/yaml.v2", "yaml"},
+		{"gopkg.in/go-yaml.v2", "yaml"},
+		{"gopkg.in/yaml-go.v2", "yaml"},
+		{"github.com/nishanths/go-xkcd", "xkcd"},
+		{"github.com/nishanths/lyft-go", "lyft"},
+	}
+	for _, tt := range testcases {
+		t.Run(tt.importPath, func(t *testing.T) {
+			got := guessPackageName(tt.importPath)
+			if tt.expect != got {
+				t.Errorf("expected: %s, got: %s", tt.expect, got)
+			}
+		})
 	}
 }

@@ -91,6 +91,7 @@
 //   Import path                            Package name    Notes
 //   -----------------                      ------------    ---------------
 //   github.com/foo/bar                     bar             Standard naming
+//   github.com/foo/bar/v2                  bar             Remove go module version
 //   gopkg.in/yaml.v2                       yaml            Remove version
 //   github.com/nishanths/go-xkcd           xkcd            Remove 'go-' prefix
 //   github.com/nishanths/lyft-go           lyft            Remove '-go' suffix
@@ -718,16 +719,17 @@ func packageNameForPath(p string, srcDir string) string {
 // The returned string may not be a valid identifier (and hence not a valid
 // package name).
 func guessPackageName(p string) string {
-	// at its most complicated, this can do:
+	// as an example, this can do:
 	// "foo.org/blah/go-yaml.v2" -> "yaml"
 	return guessPackageName_(p, true)
 }
 
 var (
-	dotvn = regexp.MustCompile(`\.v\d+$`)
+	modulevn = regexp.MustCompile(`^v\d+$`)
+	dotvn    = regexp.MustCompile(`\.v\d+$`)
 )
 
-func guessPackageName_(p string, again bool) string {
+func guessPackageName_(p string, trimVersion bool) string {
 	sidx := strings.LastIndex(p, "/")
 	if sidx == -1 {
 		return p
@@ -735,17 +737,22 @@ func guessPackageName_(p string, again bool) string {
 
 	last := p[sidx+1:]
 
-	// Order matters. For instance, the .dotvn check should happen before the
-	// "go-" prefix check.
+	// Order matters.
 	switch {
-	case again && dotvn.MatchString(last):
+	case trimVersion && modulevn.MatchString(last):
+		// foo.org/blah/go-yaml/v2
+		idx := strings.LastIndex(p, "/")
+		if idx == -1 {
+			panicf("[code bug] should have '/' in string: %s", p)
+		}
+		return guessPackageName_(p[:idx], false)
+	case trimVersion && dotvn.MatchString(last):
 		// foo.org/blah/go-yaml.v2
-		// need to use (a cleaned up version of) "go-yaml"
-		didx := strings.LastIndex(p, ".")
-		if didx == -1 {
+		idx := strings.LastIndex(p, ".")
+		if idx == -1 {
 			panicf("[code bug] should have '.' in string: %s", p)
 		}
-		return guessPackageName_(p[:didx], false)
+		return guessPackageName_(p[:idx], false)
 	case strings.HasPrefix(last, "go-"):
 		// foo.org/go-yaml
 		return strings.TrimPrefix(last, "go-")
